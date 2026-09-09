@@ -52,8 +52,8 @@ th{background:#f7f9fc}
   <h1>高等数学随堂测验</h1>
   <div class="sub">大专高等数学 · 单选题 · 共10题 · 满分100</div>
   <div class="card">
-    <label>请输入学生姓名</label>
-    <input type="text" id="nameInput" placeholder="例如：张三" maxlength="20">
+    <label>请输入编号 / 姓名</label>
+    <input type="text" id="nameInput" placeholder="输入你的编号或姓名，如：张三 / 2026001" maxlength="20">
     <button class="btn" id="startBtn" onclick="startQuiz()">开始答题</button>
   </div>
   <div class="link" onclick="showAdmin()">后台管理（成绩查询）</div>
@@ -77,8 +77,10 @@ th{background:#f7f9fc}
   <h1>后台管理</h1>
   <div class="sub">请输入管理密码</div>
   <div class="card">
-    <label>管理密码</label>
-    <input type="text" id="pwdInput" placeholder="请输入管理密码">
+    <label>账户（超管填 panhao）</label>
+    <input type="text" id="pwdInput" placeholder="账户名">
+    <label style="margin-top:12px">密码</label>
+    <input type="text" id="pwdInput2" placeholder="密码">
     <button class="btn" onclick="adminLogin()">进入后台</button>
   </div>
   <div class="link" onclick="backHome()">返回首页</div>
@@ -115,7 +117,6 @@ var QUESTIONS=[
  {q:"函数 y=ln x 的定义域是（ ）",opts:["x＞0","x≥0","全体实数","x≠1"],ans:0},
  {q:"d(e²ˣ)/dx =（ ）",opts:["e²ˣ","2e²ˣ","2x·e²ˣ","e²"],ans:1}
 ];
-var ADMIN_PWD="admin123";
 /* 云端存储：GitHub 仓库 quiz 的 data/ 目录，一人一文件，天然不冲突 */
 var TOK1="ghp_MjkBxQwkydhgmw7TxpItxQrNhtXKsO1sA",TOK2="wRS";
 var GH="https://api.github.com/repos/phgithum/cloud-db";
@@ -205,8 +206,25 @@ function showAdmin(){
   else{document.getElementById("pwdInput").value="";show("pgAdminLogin")}
 }
 function adminLogin(){
-  if(document.getElementById("pwdInput").value===ADMIN_PWD){sessionStorage.setItem("quiz_admin","1");renderAdmin();show("pgAdmin");loadSubs(true)}
-  else alert("密码错误");
+  var u=document.getElementById("pwdInput").value.trim(),p=document.getElementById("pwdInput2").value;
+  function pass(who){sessionStorage.setItem("quiz_admin","1");sessionStorage.setItem("quiz_admin_who",who);renderAdmin();show("pgAdmin");loadSubs(true)}
+  if(u==="panhao"&&p==="panhao123"){pass("超管 panhao");return}
+  loadAccs(function(list){
+    var hit=(list||[]).filter(function(a){return a.u===u&&a.p===p&&a.quiz})[0];
+    if(hit)pass("账户 "+u);
+    else alert("账户或密码错误（或无本系统权限）");
+  });
+}
+/* 账户名单：聚合后台同源 → raw → jsdelivr 逐个兜底 */
+function loadAccs(cb){
+  var us=["https://phgithum.github.io/admin-console/accounts.json?t="+Date.now(),
+          "https://raw.githubusercontent.com/phgithum/admin-console/main/accounts.json?t="+Date.now(),
+          "https://cdn.jsdelivr.net/gh/phgithum/admin-console@main/accounts.json"];
+  (function tryOne(i){
+    if(i>=us.length){cb([]);return}
+    fetch(us[i]).then(function(r){return r.ok?r.json():Promise.reject()})
+      .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
+  })(0);
 }
 function savePassLine(){
   var v=parseInt(document.getElementById("passLine").value,10);
@@ -298,7 +316,7 @@ function exportCSV(){
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},800);
 }
 
-document.getElementById("pwdInput").addEventListener("keydown",function(e){if(e.key==="Enter")adminLogin()});
+document.getElementById("pwdInput2").addEventListener("keydown",function(e){if(e.key==="Enter")adminLogin()});
 document.getElementById("nameInput").addEventListener("keydown",function(e){if(e.key==="Enter")startQuiz()});
 </script>
 </body>
