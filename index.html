@@ -200,22 +200,28 @@ var TYPE_NAME={single:"单选",multi:"多选",judge:"判断"};
 
 /* ================= 试卷读写 ================= */
 function loadPapers(cb){
-  // 通道1：raw 实时 → 通道2：GitHub API 实时（带token必新） → 通道3：jsdelivr（12h缓存，最后兜底）
-  var urls=[RAW+"/exam/papers.json?t="+Date.now()];
-  (function tryOne(i){
-    if(i===1){
-      fetch(GH+"/contents/exam/papers.json?ref=main&t="+Date.now(),{headers:ghH()})
-        .then(function(r){return r.ok?r.json():Promise.reject()})
-        .then(function(d){
-          try{var j=JSON.parse(decodeURIComponent(escape(atob(d.content))));cb(Array.isArray(j)?j:[])}
-          catch(e){cb([])}
-        }).catch(function(){tryOne(2)});
-      return;
-    }
-    if(i>=urls.length){cb([]);return}
-    fetch(urls[i]).then(function(r){return r.ok?r.json():Promise.reject()})
-      .then(function(j){cb(Array.isArray(j)?j:[])}).catch(function(){tryOne(i+1)});
-  })(0);
+  // 通道1：GitHub API 实时（带token必新） → 通道2：raw 实时 → 通道3：jsdelivr（12h缓存，最后兜底）
+  var JSDELIVR="https://cdn.jsdelivr.net/gh/phgithum/cloud-db@main/exam/papers.json";
+  function viaApi(){
+    fetch(GH+"/contents/exam/papers.json?ref=main&t="+Date.now(),{headers:ghH()})
+      .then(function(r){return r.ok?r.json():Promise.reject()})
+      .then(function(d){
+        var j=null;
+        try{j=JSON.parse(decodeURIComponent(escape(atob(d.content))))}catch(e){}
+        cb(Array.isArray(j)?j:[]);
+      }).catch(viaRaw);
+  }
+  function viaRaw(){
+    fetch(RAW+"/exam/papers.json?t="+Date.now())
+      .then(function(r){return r.ok?r.json():Promise.reject()})
+      .then(function(j){cb(Array.isArray(j)?j:[])}).catch(viaCdn);
+  }
+  function viaCdn(){
+    fetch(JSDELIVR+"?t="+Date.now())
+      .then(function(r){return r.ok?r.json():Promise.reject()})
+      .then(function(j){cb(Array.isArray(j)?j:[])}).catch(function(){cb([])});
+  }
+  viaApi();
 }
 function savePapers(list,tipEl,okTxt){
   if(tipEl)tipEl.textContent="保存中…";
