@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<html lang="zh-CN" data-page-node-id="9tXK5MdrU16Bozum9lOG5W">
+<head data-page-node-id="9JhxEsXxASlOweVKRBfTBh">
+<meta charset="UTF-8" data-page-node-id="ebqfAGiXxqEpGQ0hepU180">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" data-page-node-id="de6DxB3sBKXvyzMvzkYYPT">
 <title>在线考试系统</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -64,122 +64,122 @@ th{background:#f7f9fc}
 .hide{display:none}
 </style>
 </head>
-<body>
+<body data-page-node-id="8nmGGHBR0WEOwOYE8GxOw8">
 
 <!-- 首页：卷子列表 -->
-<div id="pgHome" class="page">
-  <h1>在线考试</h1>
-  <div class="sub">选择一张卷子开始答题</div>
-  <div id="paperList"></div>
-  <div class="link" onclick="showAdmin()">后台管理</div>
+<div id="pgHome" class="page" data-page-node-id="tSpYAp1ucLY09FzKZlPtMF">
+  <h1 data-page-node-id="TznQGzqGqecMeSpdIJgnpw">在线考试</h1>
+  <div class="sub" data-page-node-id="w39G0YcdyCCmTOUxwL2IbW">选择一张卷子开始答题</div>
+  <div id="paperList" data-page-node-id="USMOqUOR7S21lVp43rE78D"></div>
+  <div class="link" onclick="showAdmin()" data-page-node-id="dqmgvLtsZMwzrqxKXvFKwK">后台管理</div>
 </div>
 
 <!-- 输入姓名 -->
-<div id="pgName" class="page hide">
-  <h1 id="pTitle">考试</h1>
-  <div class="sub" id="pMeta"></div>
-  <div class="card">
-    <div class="info-box" id="pInfo"></div>
-    <label style="margin-top:14px">请输入编号 / 姓名</label>
-    <input type="text" id="nameInput" placeholder="输入你的编号或姓名" maxlength="20">
-    <button class="btn" id="startBtn" onclick="startExam()">开始答题</button>
+<div id="pgName" class="page hide" data-page-node-id="utJeAqlAKeDYIQCXcO7kKW">
+  <h1 id="pTitle" data-page-node-id="u5CLSbmHl59BzafdBzDD6U">考试</h1>
+  <div class="sub" id="pMeta" data-page-node-id="c4L1SjPhKgoQ3nTwMTEUb0"></div>
+  <div class="card" data-page-node-id="bpM401uTxjElu46yT9pjxW">
+    <div class="info-box" id="pInfo" data-page-node-id="y3EVSsfaYPTc4v6NV7cB5o"></div>
+    <label style="margin-top:14px" data-page-node-id="Ubpn0p77VqDqC9YdrwP9Jx">请输入编号 / 姓名</label>
+    <input type="text" id="nameInput" placeholder="输入你的编号或姓名" maxlength="20" data-page-node-id="MDllqGQgsmkIxgm562baAG">
+    <button class="btn" id="startBtn" onclick="startExam()" data-page-node-id="tVdlS8qh9jLuejAQXXkk7C">开始答题</button>
   </div>
-  <div class="link" onclick="backHome()">返回选择卷子</div>
+  <div class="link" onclick="backHome()" data-page-node-id="d6WpPI4Dnzis7o4sdhcySD">返回选择卷子</div>
 </div>
 
 <!-- 答题页 -->
-<div id="pgQuiz" class="page hide">
-  <div class="card" id="quizCard"></div>
-  <button class="btn" id="subBtn" onclick="submitQuiz()">提交答卷</button>
+<div id="pgQuiz" class="page hide" data-page-node-id="ZUAK9qYi227OjPQDSTsKuf">
+  <div class="card" id="quizCard" data-page-node-id="PyEaFqYpdEGcjmmEVKUdd7"></div>
+  <button class="btn" id="subBtn" onclick="submitQuiz()" data-page-node-id="sFft7nm8GLDMD591ugDUft">提交答卷</button>
 </div>
 
 <!-- 成绩页 -->
-<div id="pgResult" class="page hide">
-  <div class="card" style="text-align:center" id="resHead"></div>
-  <div class="card" id="resDetail"></div>
-  <button class="btn gray" onclick="backHome()">返回首页</button>
+<div id="pgResult" class="page hide" data-page-node-id="p3slDgk7qhsJcGhMGbjfCQ">
+  <div class="card" style="text-align:center" id="resHead" data-page-node-id="qa7oOtJjjIRmxeFSpCPpRE"></div>
+  <div class="card" id="resDetail" data-page-node-id="1GUVqzRC5T6i9UnHM3GfBj"></div>
+  <button class="btn gray" onclick="backHome()" data-page-node-id="cId3YYqAodYXojOXYLeCFD">返回首页</button>
 </div>
 
 <!-- 后台登录 -->
-<div id="pgAdminLogin" class="page hide">
-  <h1>后台管理</h1>
-  <div class="sub">请使用聚合后台账户登录</div>
-  <div class="card">
-    <label>账户（超管填 panhao）</label>
-    <input type="text" id="userInput" placeholder="账户名">
-    <label>密码</label>
-    <input type="text" id="pwdInput" placeholder="密码">
-    <button class="btn" onclick="adminLogin()">进入后台</button>
+<div id="pgAdminLogin" class="page hide" data-page-node-id="vzT0RQufGkqJG5zfLyTYDN">
+  <h1 data-page-node-id="wR3CQqFwJMj6OoNsV6xs19">后台管理</h1>
+  <div class="sub" data-page-node-id="3quu6uZWHrw1l0TAZ5fZ0x">请使用聚合后台账户登录</div>
+  <div class="card" data-page-node-id="ddJp8bCeuPkNwzX89zSYj7">
+    <label data-page-node-id="5I7VMTDxXJUpFvCDTdRERx">账户（超管填 panhao）</label>
+    <input type="text" id="userInput" placeholder="账户名" data-page-node-id="prdov4ZvhqRAAGqKxXC6uJ">
+    <label data-page-node-id="cshaetb88HWxwEyAuVjpIu">密码</label>
+    <input type="text" id="pwdInput" placeholder="密码" data-page-node-id="FQau9dze5qQXikBW0brZJb">
+    <button class="btn" onclick="adminLogin()" data-page-node-id="rr2Tgcqjaw4crVdJknEwcp">进入后台</button>
   </div>
-  <div class="link" onclick="backHome()">返回首页</div>
+  <div class="link" onclick="backHome()" data-page-node-id="WF5xCmr29v6qBA3vuhDU1R">返回首页</div>
 </div>
 
 <!-- 后台 -->
-<div id="pgAdmin" class="page hide">
-  <h1>考试后台</h1>
-  <div class="sub" id="whoBar"></div>
-  <div class="tabs">
-    <button class="btn small" id="tabB1" onclick="switchTab(0)">试卷管理</button>
-    <button class="btn small gray" id="tabB2" onclick="switchTab(1)">成绩查询</button>
+<div id="pgAdmin" class="page hide" data-page-node-id="SXDYpSkDMeGQOLBplgXjEE">
+  <h1 data-page-node-id="ghzB4B7ZVKBgteiSE2m5du">考试后台</h1>
+  <div class="sub" id="whoBar" data-page-node-id="M9G3KkWwGZrVnWHp7rQ9NS"></div>
+  <div class="tabs" data-page-node-id="VgEkYfxMCE8N3iZFs0zkBk">
+    <button class="btn small" id="tabB1" onclick="switchTab(0)" data-page-node-id="Vg1w7rVaLvgkMMTfmGxV6x">试卷管理</button>
+    <button class="btn small gray" id="tabB2" onclick="switchTab(1)" data-page-node-id="9NwQZKzEd7meq14c7nw6Jt">成绩查询</button>
   </div>
 
   <!-- 试卷列表 -->
-  <div id="tabPapers">
-    <div class="card">
-      <div class="row"><button class="btn small green" onclick="editPaper(null)">＋ 新建试卷</button>
-      <button class="btn small" onclick="loadPapers(true)">刷新</button></div>
-      <div class="tip" id="papersTip" style="margin-top:10px"></div>
+  <div id="tabPapers" data-page-node-id="aU7WcxajdgtYbFMqRmUDXV">
+    <div class="card" data-page-node-id="2PDJm6MC7FNBdhl3KjVueS">
+      <div class="row" data-page-node-id="EWwjo0g5qPrgD1gwIHXoFc"><button class="btn small green" onclick="editPaper(null)" data-page-node-id="H9VFAJ4O8EO1gdPh2XP5UR">＋ 新建试卷</button>
+      <button class="btn small" onclick="loadPapers(true)" data-page-node-id="NHW44ojMJ9YVqkcQ72fAD1">刷新</button></div>
+      <div class="tip" id="papersTip" style="margin-top:10px" data-page-node-id="4QSaP44cdMDZxQdWZBKNvf"></div>
     </div>
-    <div id="paperAdminList"></div>
+    <div id="paperAdminList" data-page-node-id="wBtfSEOWlDbD6yHJxwOlIv"></div>
   </div>
 
   <!-- 试卷编辑 -->
-  <div id="tabEdit" class="hide">
-    <div class="card">
-      <label>试卷标题</label>
-      <input type="text" id="cfgTitle" placeholder="例如：高数第一章测验">
-      <label>开始时间（不填=立即开始）</label>
-      <input type="datetime-local" id="cfgOpen">
-      <label>结束时间（不填=不限制）</label>
-      <input type="datetime-local" id="cfgClose">
-      <label>每人最多答题次数</label>
-      <input type="number" id="cfgTries" min="1" max="99" value="1">
-      <label>合格分数线（0-100）</label>
-      <input type="number" id="cfgPass" min="0" max="100" value="60">
+  <div id="tabEdit" class="hide" data-page-node-id="50809jEdkQ7VDUyh6vJuH8">
+    <div class="card" data-page-node-id="2FAFrg2jIS2qSBNh7UfKS0">
+      <label data-page-node-id="lf3QBPkkCTMqq8tgGsVMIF">试卷标题</label>
+      <input type="text" id="cfgTitle" placeholder="例如：高数第一章测验" data-page-node-id="nIJ6MGBOb4RaPGskot85QC">
+      <label data-page-node-id="stUUDAFedTl6IK6nSfQcTA">开始时间（不填=立即开始）</label>
+      <input type="datetime-local" id="cfgOpen" data-page-node-id="gSZKMwUIt0BWHUba3bAcKS">
+      <label data-page-node-id="Us6i6b6ZVYLSaxhrJMMGEZ">结束时间（不填=不限制）</label>
+      <input type="datetime-local" id="cfgClose" data-page-node-id="CP2XKjtmkeKuKwinzCTYTO">
+      <label data-page-node-id="Vi1zmU4mDU8SSSoVVwDTox">每人最多答题次数</label>
+      <input type="number" id="cfgTries" min="1" max="99" value="1" data-page-node-id="xcq2Mc5fKOXg7ySSNaikby">
+      <label data-page-node-id="PABBo52S3fTBiRFlxyJExu">合格分数线（0-100）</label>
+      <input type="number" id="cfgPass" min="0" max="100" value="60" data-page-node-id="ZydmOJCk43CdYQeEgtMyH3">
     </div>
-    <div class="card">
-      <div style="font-weight:600;margin-bottom:10px">题目编辑（<span id="qCount">0</span> 题，每题分值 = 100÷题数）</div>
-      <div id="qList"></div>
-      <div class="row">
-        <button class="btn small" onclick="addQ('single')">＋单选题</button>
-        <button class="btn small" onclick="addQ('multi')">＋多选题</button>
-        <button class="btn small" onclick="addQ('judge')">＋判断题</button>
+    <div class="card" data-page-node-id="EENOC9z1vuMfzp7EZSUrpr">
+      <div style="font-weight:600;margin-bottom:10px" data-page-node-id="KlWVpuB3brXM5ljPHns9UO">题目编辑（<span id="qCount" data-page-node-id="qs3Wd8nnkFqU1gcxcrHbN2">0</span> 题，每题分值 = 100÷题数）</div>
+      <div id="qList" data-page-node-id="VJdbEErV4m9HtdlnJQnp23"></div>
+      <div class="row" data-page-node-id="PqAKnUd1A4KkhCulUges5i">
+        <button class="btn small" onclick="addQ('single')" data-page-node-id="ojV0DUqe4KmSLVeA6VLNTD">＋单选题</button>
+        <button class="btn small" onclick="addQ('multi')" data-page-node-id="FVpPsXBks9QoTcOJoCzgAl">＋多选题</button>
+        <button class="btn small" onclick="addQ('judge')" data-page-node-id="k7607CmCgUW20yV45FvDWb">＋判断题</button>
       </div>
     </div>
-    <div class="card">
-      <div class="row">
-        <button class="btn small green" id="saveCfgBtn" onclick="savePaper()">保存并发布</button>
-        <button class="btn small gray" onclick="cancelEdit()">放弃修改</button>
+    <div class="card" data-page-node-id="QvyoMiS9yrpUOAvD1RqaEq">
+      <div class="row" data-page-node-id="jytLYiFcgQxA5qUpQDYqdD">
+        <button class="btn small green" id="saveCfgBtn" onclick="savePaper()" data-page-node-id="lbGMQWu7BrgiopLco4aheX">保存并发布</button>
+        <button class="btn small gray" onclick="cancelEdit()" data-page-node-id="ZK1eu201FEy8lpSz2OChGp">放弃修改</button>
       </div>
-      <div class="tip" id="cfgTip" style="margin-top:10px"></div>
+      <div class="tip" id="cfgTip" style="margin-top:10px" data-page-node-id="NZGoZ3EvnvkdlrsVvwFjsE"></div>
     </div>
   </div>
 
   <!-- 成绩查询 -->
-  <div id="tabScore" class="hide">
-    <div class="card">
-      <div>云端共 <b id="subCount">0</b> 份答卷　<span class="tip" id="syncTip"></span></div>
-      <label>按试卷筛选</label>
-      <select id="paperFilter" onchange="renderAdmin()"><option value="">全部试卷</option></select>
-      <div class="row">
-        <button class="btn small" style="background:#18a058" onclick="exportCSV()">导出Excel(CSV)</button>
-        <button class="btn small" onclick="loadSubs(true)">刷新数据</button>
-        <button class="btn small gray" onclick="clearAll()">清空记录</button>
+  <div id="tabScore" class="hide" data-page-node-id="bg491Z7Abugr0v8Z3fpl8U">
+    <div class="card" data-page-node-id="OlqtUQKD93jN6GUKjZ1LJW">
+      <div data-page-node-id="jISjds3NOejKyUMZenfVuC">云端共 <b id="subCount" data-page-node-id="74Ka7WM9m9je2CF69MraMD">0</b> 份答卷　<span class="tip" id="syncTip" data-page-node-id="1GnjPIlXCbklQngpuAFzhl"></span></div>
+      <label data-page-node-id="J9enu3bDDGzTFkkEbAOqsi">按试卷筛选</label>
+      <select id="paperFilter" onchange="renderAdmin()" data-page-node-id="hEpBhnZMgk5SkCPc6eOyIV"><option value="" data-page-node-id="tlXgBpLHW7zde4QxSxd6hR">全部试卷</option></select>
+      <div class="row" data-page-node-id="7CpHNiFKCK5GmUIY2AY5bp">
+        <button class="btn small" style="background:#18a058" onclick="exportCSV()" data-page-node-id="1EhAYDuqc1sfHj9YO267uA">导出Excel(CSV)</button>
+        <button class="btn small" onclick="loadSubs(true)" data-page-node-id="EGWr5TVQ7CeESteFE3UmVn">刷新数据</button>
+        <button class="btn small gray" onclick="clearAll()" data-page-node-id="DKr5T85DUPNIibwAuEABu7">清空记录</button>
       </div>
     </div>
-    <div class="card" id="adminList"></div>
+    <div class="card" id="adminList" data-page-node-id="xX4p1ZCAaLISIRCIRhtHlD"></div>
   </div>
-  <div class="link" onclick="backHome()">返回首页</div>
+  <div class="link" onclick="backHome()" data-page-node-id="Kl627ACsBteymjXjGRzhEX">返回首页</div>
 </div>
 
 <script>
@@ -209,13 +209,18 @@ function loadPapers(cb){
 }
 function savePapers(list,tipEl,okTxt){
   if(tipEl)tipEl.textContent="保存中…";
-  return fetch(GH+"/contents/exam/papers.json",{method:"PUT",headers:ghH(),
-    body:JSON.stringify({message:"papers update",branch:"main",
-      content:btoa(unescape(encodeURIComponent(JSON.stringify(list))))})
-  }).then(function(r){
-    if(tipEl)tipEl.textContent=r.ok?(okTxt||"✔ 已发布，1分钟内全场生效"):"✘ 保存失败 HTTP "+r.status;
-    return r.ok;
-  }).catch(function(){if(tipEl)tipEl.textContent="✘ 网络失败，请重试";return false});
+  var path=GH+"/contents/exam/papers.json";
+  var body={message:"papers update",branch:"main",
+    content:btoa(unescape(encodeURIComponent(JSON.stringify(list))))};
+  // 更新已有文件必须带 sha，否则 422；先取旧文件 sha（404 说明是新建，可无 sha）
+  return fetch(path+"?t="+Date.now(),{headers:ghH()})
+    .then(function(r){return r.ok?r.json():null})
+    .then(function(info){ if(info&&info.sha)body.sha=info.sha;
+      return fetch(path,{method:"PUT",headers:ghH(),body:JSON.stringify(body)});
+    }).then(function(r){
+      if(tipEl)tipEl.textContent=r.ok?(okTxt||"✔ 已发布，1分钟内全场生效"):"✘ 保存失败 HTTP "+r.status;
+      return r.ok;
+    }).catch(function(){if(tipEl)tipEl.textContent="✘ 网络失败，请重试";return false});
 }
 function pState(p){
   var now=Date.now();
