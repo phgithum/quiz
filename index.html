@@ -192,8 +192,11 @@ tr:nth-child(even) td{background:#fafbfe}
       <label data-page-node-id="J9enu3bDDGzTFkkEbAOqsi">按试卷筛选</label>
       <select id="paperFilter" onchange="SCORE_VIEW=this.value||null;renderAdmin()" data-page-node-id="hEpBhnZMgk5SkCPc6eOyIV"><option value="" data-page-node-id="tlXgBpLHW7zde4QxSxd6hR">全部试卷</option></select>
       <div class="row" id="exportRow" data-page-node-id="7CpHNiFKCK5GmUIY2AY5bp">
-        <button class="btn small" style="background:#18a058" onclick="exportCSV()" data-page-node-id="1EhAYDuqc1sfHj9YO267uA">导出成绩(CSV)</button>
-        <button class="btn small" onclick="exportWrong()" data-page-node-id="1EhAYDuqc2wrong">导出错题(CSV)</button>
+        <span style="font-size:12px;color:#7b8496;align-self:center">只导出低于</span>
+        <input id="scoreBelow" type="number" min="0" max="100" placeholder="不限" style="width:64px;margin:0">
+        <span style="font-size:12px;color:#7b8496;align-self:center">分</span>
+        <button class="btn small" style="background:#18a058" onclick="exportCSV()" data-page-node-id="1EhAYDuqc1sfHj9YO267uA">导出成绩(Excel)</button>
+        <button class="btn small" onclick="exportWrong()" data-page-node-id="1EhAYDuqc2wrong">导出错题(Excel)</button>
         <button class="btn small" onclick="loadSubs(true)" data-page-node-id="EGWr5TVQ7CeESteFE3UmVn">刷新数据</button>
         <button class="btn small gray" onclick="clearAll()" data-page-node-id="DKr5T85DUPNIibwAuEABu7">清空记录</button>
       </div>
@@ -465,7 +468,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260910f";
+var QUIZ_VER="V20260910g";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -541,25 +544,43 @@ function delPaper(id){
     });
   });
 }
-function delPaperRecords(p,cb){
+function delPaperRecords(p,cb,pass){
+  pass=pass||1;
   fetch(GH+"/contents/data?ref=main",{headers:ghH()}).then(function(r){return r.json()}).then(function(list){
     if(!Array.isArray(list))return cb(0);
-    var jobs=[],n=0;
+    var jobs=[],n=0,left=0;
     list.forEach(function(f){
       if(!/\.json$/.test(f.name))return;
-      var parts=decodeURIComponent(f.name).replace(/\.json$/,"").split("_");
       var job=fetch(f.url,{headers:ghH()}).then(function(r){return r.json()}).then(function(d){
         try{
           var rec=JSON.parse(decodeURIComponent(escape(atob(d.content))));
           if(rec.paperId===p.id||rec.paperTitle===p.title){
-            n++;return fetch(GH+"/contents/"+f.path,{method:"DELETE",headers:ghH(),body:JSON.stringify({message:"del record",branch:"main",sha:d.sha})});
+            n++;
+            return fetch(GH+"/contents/"+f.path,{method:"DELETE",headers:ghH(),body:JSON.stringify({message:"del record",branch:"main",sha:d.sha})})
+              .then(function(r){ if(!r.ok)left++; }).catch(function(){left++});
           }
         }catch(e){}
       }).catch(function(){});
       jobs.push(job);
     });
-    Promise.all(jobs).then(function(){cb(n)}).catch(function(){cb(n)});
+    return Promise.all(jobs).then(function(){
+      if(left>0&&pass<3){ /* 有删失败的，复核一轮重试 */
+        delPaperRecords(p,function(m){cb(n+m)},pass+1);
+      }else cb(n);
+    });
   }).catch(function(){cb(0)});
+}
+/* 总览页：清除已删试卷的残留成绩记录（按卷名匹配） */
+function purgeOrphan(t){
+  if(!IS_MASTER){alert("只有超管可以清除残留记录");return}
+  if(!confirm("试卷「"+t+"」已被删除，但云端还残留它的成绩记录。\n确定把这些残留记录全部清除？"))return;
+  syncTip("清理残留中…");
+  delPaperRecords({id:"__gone__",title:t},function(n){
+    CLOUD=CLOUD.filter(function(r){return r.paperTitle!==t});
+    saveLocalCache(CLOUD);
+    renderAdmin();
+    syncTip(n?("已清除 "+n+" 条残留记录 ✓"):"未发现残留（可能刚才是缓存，已刷新）");
+  });
 }
 
 /* ================= 题目编辑 ================= */
@@ -704,12 +725,15 @@ function renderAdmin(){
         var passN=ss.filter(function(s){return s>=pl}).length;
         var rate=Math.round(passN/ss.length*100);
         var col=rate>=80?"#159c52":(rate>=50?"#c77d0a":"#d93a3a");
-        cw+='<div class="pcard" style="animation-delay:'+(i*0.06)+'s" onclick="openPaperScore(\''+esc(k).replace(/'/g,"\'")+'\')">'
-          +'<div style="font-size:14px;font-weight:700;line-height:1.5;margin-bottom:8px">'+esc(k)+'</div>'
+        var orphan=!pw.id;
+        cw+='<div class="pcard" style="animation-delay:'+(i*0.06)+'s'+(orphan?';border-left-color:#c77d0a;opacity:.75':'')+'" onclick="openPaperScore(\''+esc(k).replace(/'/g,"\'")+'\')">'
+          +'<div style="font-size:14px;font-weight:700;line-height:1.5;margin-bottom:8px">'+esc(k)+(orphan?' <span style="font-size:11px;font-weight:400;color:#c77d0a">（卷已删·残留）</span>':'')+'</div>'
           +'<div style="display:flex;gap:14px;font-size:12px;color:#7b8496"><span>人数 <b style="color:#1c2330">'+rs.length+'</b></span><span>平均 <b style="color:#2456c4">'+avg+'</b></span><span>最高 <b>'+hi+'</b></span><span>最低 <b>'+lo+'</b></span></div>'
           +'<div style="margin-top:10px;font-size:12px;color:#7b8496">及格率 <b style="color:'+col+'">'+rate+'%</b>（'+passN+'/'+rs.length+'）</div>'
           +'<div style="background:#eef1f6;border-radius:4px;height:8px;margin-top:5px;overflow:hidden"><div style="width:'+rate+'%;height:100%;background:'+col+'"></div></div>'
-          +'<div style="margin-top:10px;font-size:12px;color:#2456c4;font-weight:600">查看分析看板 →</div></div>';
+          +'<div style="margin-top:10px;font-size:12px;color:#2456c4;font-weight:600">查看分析看板 →</div>'
+          +(orphan?'<div style="margin-top:6px;font-size:12px;color:#c77d0a" onclick="event.stopPropagation();purgeOrphan(\''+esc(k).replace(/'/g,"\\'")+'\')">清除残留成绩记录</div>':'')
+          +'</div>';
       });
       cw+='</div>';
     }
@@ -839,10 +863,16 @@ function renderStats(f,view){
   h+=qh;
   box.innerHTML=h;
 }
-function exportWrong(){
-  var all=visibleRecs(),f=document.getElementById("paperFilter").value;
+function scoreFilterView(){
+  var all=visibleRecs(),f=SCORE_VIEW||document.getElementById("paperFilter").value;
   var view=f?all.filter(function(r){return r.paperTitle===f}):all;
-  if(!view.length){alert("暂无记录可导出");return}
+  var v=document.getElementById("scoreBelow").value;
+  if(v!==""&&!isNaN(+v))view=view.filter(function(r){return r.score<+v});
+  return view;
+}
+function exportWrong(){
+  var view=scoreFilterView();
+  if(!view.length){alert("暂无符合筛选条件的记录可导出");return}
   var qs={};
   view.forEach(function(r){ r.detail.forEach(function(d){
     var k=(r.paperTitle||"未知试卷")+"||"+(d.q||"");
@@ -866,9 +896,8 @@ function exportWrong(){
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},800);
 }
 function exportCSV(){
-  var all=visibleRecs(),f=document.getElementById("paperFilter").value;
-  var view=f?all.filter(function(r){return r.paperTitle===f}):all;
-  if(!view.length){alert("暂无记录可导出");return}
+  var view=scoreFilterView();
+  if(!view.length){alert("暂无符合筛选条件的记录可导出");return}
   var maxN=Math.max.apply(null,view.map(function(r){return r.detail.length}));
   var rows=[["姓名","试卷","提交时间","总分","合格判定"]];
   for(var i=0;i<maxN;i++)rows[0].push("第"+(i+1)+"题");
