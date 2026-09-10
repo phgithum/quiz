@@ -190,8 +190,8 @@ tr:nth-child(even) td{background:#fafbfe}
     <div class="card" data-page-node-id="OlqtUQKD93jN6GUKjZ1LJW">
       <div data-page-node-id="jISjds3NOejKyUMZenfVuC">云端共 <b id="subCount" data-page-node-id="74Ka7WM9m9je2CF69MraMD">0</b> 份答卷　<span class="tip" id="syncTip" data-page-node-id="1GnjPIlXCbklQngpuAFzhl"></span></div>
       <label data-page-node-id="J9enu3bDDGzTFkkEbAOqsi">按试卷筛选</label>
-      <select id="paperFilter" onchange="renderAdmin()" data-page-node-id="hEpBhnZMgk5SkCPc6eOyIV"><option value="" data-page-node-id="tlXgBpLHW7zde4QxSxd6hR">全部试卷</option></select>
-      <div class="row" data-page-node-id="7CpHNiFKCK5GmUIY2AY5bp">
+      <select id="paperFilter" onchange="SCORE_VIEW=this.value||null;renderAdmin()" data-page-node-id="hEpBhnZMgk5SkCPc6eOyIV"><option value="" data-page-node-id="tlXgBpLHW7zde4QxSxd6hR">全部试卷</option></select>
+      <div class="row" id="exportRow" data-page-node-id="7CpHNiFKCK5GmUIY2AY5bp">
         <button class="btn small" style="background:#18a058" onclick="exportCSV()" data-page-node-id="1EhAYDuqc1sfHj9YO267uA">导出成绩(CSV)</button>
         <button class="btn small" onclick="exportWrong()" data-page-node-id="1EhAYDuqc2wrong">导出错题(CSV)</button>
         <button class="btn small" onclick="loadSubs(true)" data-page-node-id="EGWr5TVQ7CeESteFE3UmVn">刷新数据</button>
@@ -465,7 +465,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260910d";
+var QUIZ_VER="V20260910f";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -531,9 +531,35 @@ function dupPaper(id){
 }
 function delPaper(id){
   var p=PAPERS.filter(function(x){return x.id===id})[0];
-  if(!confirm("确定删除试卷「"+p.title+"」？（已交的答卷记录仍保留）"))return;
+  if(!confirm("确定删除试卷「"+p.title+"」？\n该卷已交的答卷记录和分析数据会一并删除（作废），不可恢复！"))return;
   PAPERS=PAPERS.filter(function(x){return x.id!==id});
-  savePapers(PAPERS,document.getElementById("papersTip"),"✔ 已删除").then(function(ok){if(ok)renderPaperAdmin()});
+  savePapers(PAPERS,document.getElementById("papersTip"),"删除中…").then(function(ok){
+    if(!ok)return;
+    renderPaperAdmin();
+    delPaperRecords(p,function(n){
+      document.getElementById("papersTip").textContent="✔ 试卷已删除，连带清除了 "+n+" 份答卷记录";
+    });
+  });
+}
+function delPaperRecords(p,cb){
+  fetch(GH+"/contents/data?ref=main",{headers:ghH()}).then(function(r){return r.json()}).then(function(list){
+    if(!Array.isArray(list))return cb(0);
+    var jobs=[],n=0;
+    list.forEach(function(f){
+      if(!/\.json$/.test(f.name))return;
+      var parts=decodeURIComponent(f.name).replace(/\.json$/,"").split("_");
+      var job=fetch(f.url,{headers:ghH()}).then(function(r){return r.json()}).then(function(d){
+        try{
+          var rec=JSON.parse(decodeURIComponent(escape(atob(d.content))));
+          if(rec.paperId===p.id||rec.paperTitle===p.title){
+            n++;return fetch(GH+"/contents/"+f.path,{method:"DELETE",headers:ghH(),body:JSON.stringify({message:"del record",branch:"main",sha:d.sha})});
+          }
+        }catch(e){}
+      }).catch(function(){});
+      jobs.push(job);
+    });
+    Promise.all(jobs).then(function(){cb(n)}).catch(function(){cb(n)});
+  }).catch(function(){cb(0)});
 }
 
 /* ================= 题目编辑 ================= */
@@ -649,33 +675,71 @@ function visibleRecs(){
   var mine=myPapers().map(function(p){return p.title});
   return all.filter(function(r){return mine.indexOf(r.paperTitle)>=0});
 }
+var SCORE_VIEW=null;
 function renderAdmin(){
   var all=visibleRecs();
   document.getElementById("subCount").textContent=all.length;
-  // 试卷筛选下拉
-  var sel=document.getElementById("paperFilter"),cur=sel.value;
+  var sel=document.getElementById("paperFilter"),cur=sel.value||SCORE_VIEW||"";
   var titles=[];
   all.forEach(function(r){if(r.paperTitle&&titles.indexOf(r.paperTitle)<0)titles.push(r.paperTitle)});
   sel.innerHTML='<option value="">全部试卷</option>'+titles.map(function(t){return '<option value="'+esc(t)+'"'+(t===cur?' selected':'')+'>'+esc(t)+'</option>'}).join("");
-  var f=sel.value;
-  var view=f?all.filter(function(r){return r.paperTitle===f}):all;
+  if(!SCORE_VIEW){
+    /* ===== 总览：试卷卡片墙 ===== */
+    var byP={};
+    all.forEach(function(r){ var k=r.paperTitle||"未知试卷"; byP[k]=byP[k]||[]; byP[k].push(r); });
+    var cw='<style>@keyframes cardin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}'
+      +'.pcard{background:#fff;border:1px solid var(--line);border-left:4px solid #2456c4;border-radius:10px;padding:14px 16px;cursor:pointer;transition:box-shadow .15s,transform .15s;animation:cardin .4s backwards}'
+      +'.pcard:hover{box-shadow:0 6px 18px rgba(36,86,196,.14);transform:translateY(-2px)}'
+      +'.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-top:12px}</style>';
+    cw+='<div style="display:flex;align-items:center;justify-content:space-between"><h2 style="font-size:15px;margin:0">考试概况</h2><span style="font-size:12px;color:#99a">点击卡片查看图表分析</span></div>';
+    if(!Object.keys(byP).length){ cw+='<div class="muted" style="padding:20px">暂无答卷记录</div>'; }
+    else{
+      cw+='<div class="pgrid">';
+      Object.keys(byP).forEach(function(k,i){
+        var rs=byP[k], ss=rs.map(function(r){return r.score});
+        var avg=Math.round(ss.reduce(function(a,b){return a+b},0)/ss.length*10)/10;
+        var hi=Math.max.apply(null,ss), lo=Math.min.apply(null,ss);
+        var pw=PAPERS.filter(function(p){return p.title===k})[0]||{};
+        var pl=pw.passLine!=null?pw.passLine:60;
+        var passN=ss.filter(function(s){return s>=pl}).length;
+        var rate=Math.round(passN/ss.length*100);
+        var col=rate>=80?"#159c52":(rate>=50?"#c77d0a":"#d93a3a");
+        cw+='<div class="pcard" style="animation-delay:'+(i*0.06)+'s" onclick="openPaperScore(\''+esc(k).replace(/'/g,"\'")+'\')">'
+          +'<div style="font-size:14px;font-weight:700;line-height:1.5;margin-bottom:8px">'+esc(k)+'</div>'
+          +'<div style="display:flex;gap:14px;font-size:12px;color:#7b8496"><span>人数 <b style="color:#1c2330">'+rs.length+'</b></span><span>平均 <b style="color:#2456c4">'+avg+'</b></span><span>最高 <b>'+hi+'</b></span><span>最低 <b>'+lo+'</b></span></div>'
+          +'<div style="margin-top:10px;font-size:12px;color:#7b8496">及格率 <b style="color:'+col+'">'+rate+'%</b>（'+passN+'/'+rs.length+'）</div>'
+          +'<div style="background:#eef1f6;border-radius:4px;height:8px;margin-top:5px;overflow:hidden"><div style="width:'+rate+'%;height:100%;background:'+col+'"></div></div>'
+          +'<div style="margin-top:10px;font-size:12px;color:#2456c4;font-weight:600">查看分析看板 →</div></div>';
+      });
+      cw+='</div>';
+    }
+    document.getElementById("statBox").innerHTML=cw;
+    document.getElementById("adminList").innerHTML='';
+    document.getElementById("exportRow").style.opacity=.45;
+    return;
+  }
+  document.getElementById("exportRow").style.opacity=1;
+  var f=SCORE_VIEW;
+  var view=all.filter(function(r){return r.paperTitle===f});
   var pl=(f?(PAPERS.filter(function(p){return p.title===f})[0]||{}).passLine:null);
   if(pl==null)pl=60;
   renderStats(f,view);
   if(!view.length){document.getElementById("adminList").innerHTML='<div class="muted" style="padding:20px">暂无答卷记录</div>';return}
-  var h='<table><tr><th>姓名</th><th>试卷</th><th>提交时间</th><th>得分</th><th>判定</th><th>每题作答</th></tr>';
+  var h='<div class="link" style="margin:0 0 10px;text-align:left" onclick="SCORE_VIEW=null;renderAdmin()">← 返回试卷总览</div>';
+  h+='<table><tr><th>姓名</th><th>提交时间</th><th>得分</th><th>判定</th><th>每题作答</th></tr>';
   view.forEach(function(r){
     var det=r.detail.map(function(d,i){
       var my=Array.isArray(d.my)?(d.my.length?d.my.map(function(v){return "ABCD"[v]}).join(""):"-"):(d.my<0?"-":"ABCD"[d.my]);
       return (i+1)+":"+my+(d.ok?"√":"×");
     }).join(" ");
-    h+='<tr><td>'+esc(r.name)+'</td><td>'+esc(r.paperTitle||"")+'</td><td>'+esc(r.time||"")+'</td><td><b>'+r.score+'</b></td>'+
+    h+='<tr><td>'+esc(r.name)+'</td><td>'+esc(r.time||"")+'</td><td><b>'+r.score+'</b></td>'+
        '<td style="color:'+(r.score>=pl?'#18a058':'#d93535')+'">'+(r.score>=pl?'合格':'不合格')+'</td>'+
        '<td style="text-align:left;font-size:11px">'+esc(det)+'</td></tr>';
   });
   h+='</table>';
   document.getElementById("adminList").innerHTML=h;
 }
+function openPaperScore(t){SCORE_VIEW=t;renderAdmin();window.scrollTo(0,0)}
 function clearAll(){
   if(!IS_MASTER){alert("只有超管可以清空全部记录");return}
   if(!confirm("确定清空全部云端答卷记录？此操作不可恢复！"))return;
@@ -695,45 +759,85 @@ function renderStats(f,view){
   var scores=view.map(function(r){return r.score});
   var avg=Math.round(scores.reduce(function(a,b){return a+b},0)/scores.length*10)/10;
   var hi=Math.max.apply(null,scores), lo=Math.min.apply(null,scores);
-  var pass=0;
-  if(f){var pw=PAPERS.filter(function(p){return p.title===f})[0]||{};var pl=pw.passLine!=null?pw.passLine:60;
-    pass=Math.round(view.filter(function(r){return r.score>=pl}).length/view.length*100);
-    var h2='<h2 style="font-size:15px">'+esc(f)+' · 整体概况</h2>';
-    h2+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px">';
-    [["答题人数",view.length],["平均分",avg],["最高分",hi],["最低分",lo],["及格率",pass+"%"],["合格线",pl+" 分"]].forEach(function(kv){
-      h2+='<div><div style="font-size:12px;color:#7b8496">'+kv[0]+'</div><div style="font-size:22px;font-weight:700;color:#2456c4">'+kv[1]+'</div></div>';
-    });
-    h2+='</div>';
-    /* 每题正确率（有题目文本的记录才参与，兼容旧数据） */
-    var qs={}; /* q文本 -> {ok:0,n:0} */
-    view.forEach(function(r){ r.detail.forEach(function(d){
-      if(!d.q)return; var k=d.q; qs[k]=qs[k]||{ok:0,n:0,opts:d.opts,ans:d.ans}; qs[k].n++; if(d.ok)qs[k].ok++;
-    })});
-    var arr=Object.keys(qs).map(function(k){return {q:k,ok:qs[k].ok,n:qs[k].n,rate:Math.round(qs[k].ok/qs[k].n*100),opts:qs[k].opts,ans:qs[k].ans}});
-    if(arr.length){
-      arr.sort(function(a,b){return a.rate-b.rate});
-      h2+='<div style="margin-top:14px;font-size:13px;font-weight:600">每题正确率（错得最多的排前面）</div>';
-      h2+='<table style="margin-top:6px"><thead><tr><th style="width:36px">题号</th><th style="text-align:left">题目</th><th style="width:120px">正确率</th><th style="width:70px">答错人数</th></tr></thead><tbody>';
-      arr.forEach(function(x,i){
-        var col=x.rate>=80?"#159c52":(x.rate>=50?"#c77d0a":"#d93a3a");
-        var ansStr=(x.ans||[]).map(function(v){return "ABCD"[v]}).join("");
-        h2+='<tr><td>'+(i+1)+'</td><td style="text-align:left">'+esc(String(x.q).slice(0,40))+(ansStr?'<span style="color:#889;font-size:11px">（正确答案:'+ansStr+'）</span>':'')+'</td>'
-          +'<td><div style="background:#eef1f6;border-radius:4px;overflow:hidden"><div style="width:'+x.rate+'%;height:14px;background:'+col+'"></div></div><span style="font-size:11px;color:'+col+'">'+x.rate+'%</span></td>'
-          +'<td>'+(x.n-x.ok)+'</td></tr>';
-      });
-      h2+='</tbody></table>';
-    } else h2+='<div style="margin-top:12px;font-size:12px;color:#99a">这批答卷提交于旧版本（无逐题详情），升级后新提交的答卷会有每题正确率分析</div>';
-    box.innerHTML=h2;
-  } else {
+  var sorted=view.slice().sort(function(a,b){return a.ts-b.ts});
+  if(!f){
     var byPaper={};
     view.forEach(function(r){ var k=r.paperTitle||"未知试卷"; byPaper[k]=byPaper[k]||[]; byPaper[k].push(r.score); });
-    var h2='<h2 style="font-size:15px">各试卷概况（选择单张试卷看详细看板）</h2><table style="margin-top:8px"><thead><tr><th style="text-align:left">试卷</th><th>人数</th><th>平均分</th><th>最高</th><th>最低</th></tr></thead><tbody>';
+    var h2='<h2 style="font-size:15px">各试卷概况（选择单张试卷看完整图表看板）</h2><table style="margin-top:8px"><thead><tr><th style="text-align:left">试卷</th><th>人数</th><th>平均分</th><th>最高</th><th>最低</th></tr></thead><tbody>';
     Object.keys(byPaper).forEach(function(k){
       var ss=byPaper[k];
       h2+='<tr><td style="text-align:left">'+esc(k)+'</td><td>'+ss.length+'</td><td><b>'+Math.round(ss.reduce(function(a,b){return a+b},0)/ss.length*10)/10+'</b></td><td>'+Math.max.apply(null,ss)+'</td><td>'+Math.min.apply(null,ss)+'</td></tr>';
     });
     box.innerHTML=h2+'</tbody></table>';
+    return;
   }
+  var pw=PAPERS.filter(function(p){return p.title===f})[0]||{};
+  var pl=pw.passLine!=null?pw.passLine:60;
+  var passN=view.filter(function(r){return r.score>=pl}).length;
+  var passRate=Math.round(passN/view.length*100);
+  /* ---- 分数分布 ---- */
+  var buckets=[["0-59",0],["60-69",0],["70-79",0],["80-89",0],["90-100",0]];
+  scores.forEach(function(s){ var i=s>=90?4:s>=80?3:s>=70?2:s>=60?1:0; buckets[i][1]++; });
+  var maxB=Math.max.apply(null,buckets.map(function(b){return b[1]}))||1;
+  var bars='';
+  buckets.forEach(function(b,i){
+    var hPct=Math.round(b[1]/maxB*100);
+    var col=b[0]==="0-59"?"#d93a3a":"#2456c4";
+    bars+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">'
+      +'<div style="font-size:12px;font-weight:700;color:'+col+'">'+b[1]+'</div>'
+      +'<div style="width:70%;height:110px;display:flex;align-items:flex-end"><div class="gbar" style="width:100%;height:'+Math.max(b[1]?8:2, hPct)+'%;background:'+col+';animation-delay:'+(i*0.1)+'s"></div></div>'
+      +'<div style="font-size:11px;color:#7b8496">'+b[0]+'分</div></div>';
+  });
+  /* ---- 及格率环形 ---- */
+  var C=2*Math.PI*44, arc=C*passRate/100;
+  var donutCol=passRate>=80?"#159c52":(passRate>=50?"#c77d0a":"#d93a3a");
+  /* ---- 时间趋势折线 ---- */
+  var W=460,H=110,pad=8;
+  var pts=sorted.map(function(r,i){return [pad+i*(W-2*pad)/Math.max(1,sorted.length-1), H-pad-(r.score/100)*(H-2*pad)];});
+  var poly=pts.map(function(p){return p[0].toFixed(1)+","+p[1].toFixed(1)}).join(" ");
+  var lineCol=avg>=pl?"#159c52":"#2456c4";
+  /* ---- 每题正确率 ---- */
+  var qs={};
+  view.forEach(function(r){ r.detail.forEach(function(d){
+    if(!d.q)return; var k=d.q; qs[k]=qs[k]||{ok:0,n:0,ans:d.ans}; qs[k].n++; if(d.ok)qs[k].ok++;
+  })});
+  var qarr=Object.keys(qs).map(function(k){return {q:k,ok:qs[k].ok,n:qs[k].n,rate:Math.round(qs[k].ok/qs[k].n*100),ans:qs[k].ans}});
+  var qh='';
+  if(qarr.length){
+    qarr.sort(function(a,b){return a.rate-b.rate});
+    qh='<div style="margin-top:22px;font-size:13px;font-weight:600">每题正确率（错得最多的排前面）</div>';
+    qarr.forEach(function(x,i){
+      var col=x.rate>=80?"#159c52":(x.rate>=50?"#c77d0a":"#d93a3a");
+      var ansStr=(x.ans||[]).map(function(v){return "ABCD"[v]}).join("");
+      qh+='<div style="margin-top:10px"><div style="font-size:12px;display:flex;justify-content:space-between;gap:8px"><span>'+esc(String(x.q).slice(0,46))+(ansStr?' <span style="color:#889">（答案:'+ansStr+'）</span>':'')+'</span><b style="color:'+col+'">'+x.rate+'%</b></div>'
+        +'<div style="background:#eef1f6;border-radius:4px;height:10px;margin-top:4px;overflow:hidden"><div class="gbar" style="width:'+x.rate+'%;height:100%;background:'+col+';animation-delay:'+(i*0.08)+'s"></div></div>'
+        +'<div style="font-size:11px;color:#99a;margin-top:2px">答错 '+(x.n-x.ok)+' 人</div></div>';
+    });
+  } else qh='<div style="margin-top:14px;font-size:12px;color:#99a">这批答卷提交于旧版本（无逐题详情），新提交的答卷会有每题正确率分析</div>';
+  var h='<style>@keyframes gup{from{transform:scaleY(0)}to{transform:scaleY(1)}}@keyframes gwin{from{width:0 !important}}@keyframes gdonut{from{stroke-dasharray:0 '+C+'}}@keyframes gline{to{stroke-dashoffset:0}}@keyframes gnum{from{opacity:0;transform:translateY(6px)}}'
+    +'.gbar{animation:gup .7s cubic-bezier(.2,.8,.3,1) backwards;transform-origin:bottom}.gwin{animation:gwin 1s .3s cubic-bezier(.2,.8,.3,1) backwards}.gdonut{animation:gdonut 1.2s .2s ease backwards}.gline{stroke-dasharray:1200;stroke-dashoffset:1200;animation:gline 1.4s .2s ease forwards}.gnum{animation:gnum .5s backwards}</style>';
+  h+='<h2 style="font-size:15px">'+esc(f)+' · 分析看板</h2>';
+  h+='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px">';
+  [["答题人数",view.length,"人"],["平均分",avg,"分"],["最高分",hi,"分"],["最低分",lo,"分"],["及格率",passRate,"%"]].forEach(function(kv,i){
+    h+='<div class="gnum" style="background:#f6f8fc;border-radius:10px;padding:12px 18px;min-width:86px;animation-delay:'+(i*0.08)+'s"><div style="font-size:12px;color:#7b8496">'+kv[0]+'</div><div style="font-size:24px;font-weight:700;color:#2456c4;font-variant-numeric:tabular-nums">'+kv[1]+'<span style="font-size:12px;color:#99a;font-weight:400">'+kv[2]+'</span></div></div>';
+  });
+  h+='</div>';
+  h+='<div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:18px;align-items:flex-start">';
+  h+='<div style="flex:1;min-width:260px"><div style="font-size:13px;font-weight:600">分数分布</div><div style="display:flex;gap:6px;margin-top:10px">'+bars+'</div></div>';
+  h+='<div style="width:150px;text-align:center"><div style="font-size:13px;font-weight:600">及格率</div>'
+    +'<svg width="130" height="130" viewBox="0 0 110 110" style="margin-top:6px"><circle cx="55" cy="55" r="44" fill="none" stroke="#eef1f6" stroke-width="11"/>'
+    +'<circle class="gdonut" cx="55" cy="55" r="44" fill="none" stroke="'+donutCol+'" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+arc.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 55 55)"/>'
+    +'<text x="55" y="52" text-anchor="middle" font-size="20" font-weight="700" fill="'+donutCol+'">'+passRate+'%</text>'
+    +'<text x="55" y="70" text-anchor="middle" font-size="10" fill="#99a">'+passN+'/'+view.length+' 人及格</text></svg></div>';
+  h+='</div>';
+  h+='<div style="margin-top:20px"><div style="font-size:13px;font-weight:600">成绩趋势（按提交时间，红线为合格线 '+pl+' 分）</div>'
+    +'<svg viewBox="0 0 '+W+' '+(H+16)+'" style="width:100%;max-width:560px;margin-top:8px">'
+    +'<line x1="'+pad+'" y1="'+(H-pad-(pl/100)*(H-2*pad)).toFixed(1)+'" x2="'+(W-pad)+'" y2="'+(H-pad-(pl/100)*(H-2*pad)).toFixed(1)+'" stroke="#d93a3a" stroke-width="1" stroke-dasharray="4 4" opacity=".6"/>'
+    +'<polyline class="gline" points="'+poly+'" fill="none" stroke="'+lineCol+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'
+    +pts.map(function(p){return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.5" fill="'+lineCol+'"/>'}).join("")
+    +'</svg></div>';
+  h+=qh;
+  box.innerHTML=h;
 }
 function exportWrong(){
   var all=visibleRecs(),f=document.getElementById("paperFilter").value;
