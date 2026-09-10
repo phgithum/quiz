@@ -146,7 +146,11 @@ th{background:#f7f9fc}
       <input type="number" id="cfgTries" min="1" max="99" value="1" data-page-node-id="xcq2Mc5fKOXg7ySSNaikby">
       <label data-page-node-id="PABBo52S3fTBiRFlxyJExu">合格分数线（0-100）</label>
       <input type="number" id="cfgPass" min="0" max="100" value="60"
-      <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShowAns" style="width:18px;height:18px;flex:none"> 提交后向学生显示得分和正确答案</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">不勾选 = 学生交卷只见「已提交」，成绩由老师统一公布</span></label> data-page-node-id="ZydmOJCk43CdYQeEgtMyH3">
+      <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShowAns" style="width:18px;height:18px;flex:none"> 提交后向学生显示得分和正确答案</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">不勾选 = 学生交卷只见「已提交」，成绩由老师统一公布</span></label>
+      <label style="margin-top:14px">抽题数（题库共 N 题，每个学生随机抽 M 题；不填或填 0 = 全部题目）</label>
+      <input type="number" id="cfgDraw" min="0" max="999" value="0" placeholder="0=全部">
+      <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShufQ" style="width:18px;height:18px;flex:none"> 打乱题目顺序</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">每个学生开考时题目随机排序</span></label>
+      <label style="margin-top:10px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShufO" style="width:18px;height:18px;flex:none"> 打乱选项顺序</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">每个学生开考时每题选项随机排序（答案自动跟着选项走）</span></label>
     </div>
     <div class="card" data-page-node-id="EENOC9z1vuMfzp7EZSUrpr">
       <div style="font-weight:600;margin-bottom:10px" data-page-node-id="KlWVpuB3brXM5ljPHns9UO">题目编辑（<span id="qCount" data-page-node-id="qs3Wd8nnkFqU1gcxcrHbN2">0</span> 题，每题分值 = 100÷题数）</div>
@@ -191,7 +195,7 @@ var RAW="https://raw.githubusercontent.com/phgithum/cloud-db/main";
 function ghH(){return{"Authorization":"Bearer "+TOK1+TOK2,"Accept":"application/vnd.github+json","Content-Type":"application/json","User-Agent":"quiz-h5"}}
 
 /* ================= 状态 ================= */
-var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,CLOUD=[];
+var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,CLOUD=[],EXAM_QS=[];
 function localCache(){try{return JSON.parse(localStorage.getItem("quiz_subs")||"[]")}catch(e){return[]}}
 function saveLocalCache(a){try{localStorage.setItem("quiz_subs",JSON.stringify(a))}catch(e){}}
 function show(id){["pgHome","pgName","pgQuiz","pgResult","pgAdminLogin","pgAdmin"].forEach(function(p){document.getElementById(p).classList.add("hide")});document.getElementById(id).classList.remove("hide");window.scrollTo(0,0)}
@@ -269,17 +273,34 @@ function openPaper(id){
   if(!p)return;
   CUR=p;
   document.getElementById("pTitle").textContent=p.title;
-  document.getElementById("pMeta").textContent=qTypeSummary(p.questions)+"　共 "+p.questions.length+" 题　满分 100";
+  var st=pState(p);
+  var draw=Math.max(0,parseInt(p.draw||0,10)||0);
+  document.getElementById("pMeta").textContent=qTypeSummary(p.questions)+"　题库 "+p.questions.length+" 题"+(draw>0?"　开考随机抽 "+draw+" 题":"")+"　满分 100";
   var info=["每人可答：<b>"+(p.tries||1)+"</b> 次　合格线："+(p.passLine!=null?p.passLine:60)+" 分"];
+  if(draw>0)info.push("每人试卷从 "+p.questions.length+" 题题库中随机抽取 "+draw+" 题"+(p.shuffleQ?"，题目乱序":"")+(p.shuffleO?"，选项乱序":""));
   if(p.openT)info.push("开始："+fmtT(p.openT));
   if(p.closeT)info.push('截止：<b>'+fmtT(p.closeT)+'</b>');
-  var st=pState(p);
   if(st==="early")info.push('<span class="warn">⚠ 考试尚未开始，到点才能进</span>');
   if(st==="over")info.push('<span class="warn">⚠ 考试已结束</span>');
   document.getElementById("startBtn").disabled=(st!=="ing");
   document.getElementById("pInfo").innerHTML=info.join("<br>");
   document.getElementById("nameInput").value="";
   show("pgName");
+}
+function shuffleArr(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+function buildExam(){
+  /* 从题库抽题 + 打乱（深拷贝，不动原卷） */
+  var qs=JSON.parse(JSON.stringify(CUR.questions));
+  var draw=Math.max(0,parseInt(CUR.draw||0,10)||0);
+  if(draw>0&&draw<qs.length)shuffleArr(qs).length=draw;else shuffleArr(qs);
+  if(CUR.shuffleO){
+    qs.forEach(function(q){
+      var idx=shuffleArr(q.opts.map(function(_,i){return i}));
+      q.opts=idx.map(function(i){return q.opts[i]});
+      q.ans=q.ans.map(function(a){return idx.indexOf(a)}).sort();
+    });
+  }
+  return qs;
 }
 function startExam(){
   var n=document.getElementById("nameInput").value.trim();
@@ -291,7 +312,9 @@ function startExam(){
   countAttempts(n,CUR.id,function(used){
     document.getElementById("startBtn").disabled=false;document.getElementById("startBtn").textContent="开始答题";
     if(used>=(CUR.tries||1)){alert("这张卷子你已答满 "+(CUR.tries||1)+" 次，不能再答了");return}
-    studentName=n;answers=CUR.questions.map(function(q){return q.type==="multi"?[]:-1});
+    studentName=n;
+    EXAM_QS=buildExam();
+    answers=EXAM_QS.map(function(q){return q.type==="multi"?[]:-1});
     renderQuiz();show("pgQuiz");
   });
 }
@@ -304,7 +327,7 @@ function countAttempts(name,pid,cb){
 /* ================= 答题 ================= */
 function renderQuiz(){
   var h="";
-  CUR.questions.forEach(function(q,i){
+  EXAM_QS.forEach(function(q,i){
     h+='<div style="margin-bottom:22px"><div class="q-tit"><span class="q-num">'+(i+1)+'</span>【'+TYPE_NAME[q.type]+'】'+esc(q.q)+'</div>';
     q.opts.forEach(function(o,j){
       var sel=Array.isArray(answers[i])?answers[i].indexOf(j)>=0:answers[i]===j;
@@ -313,11 +336,11 @@ function renderQuiz(){
     h+='</div>';
   });
   var done=answers.filter(function(a){return Array.isArray(a)?a.length:(a>=0)}).length;
-  h+='<div class="muted">已答 '+done+' / '+CUR.questions.length+' 题</div>';
+  h+='<div class="muted">已答 '+done+' / '+EXAM_QS.length+' 题</div>';
   document.getElementById("quizCard").innerHTML=h;
 }
 function pick(i,j){
-  if(CUR.questions[i].type==="multi"){
+  if(EXAM_QS[i].type==="multi"){
     var k=answers[i].indexOf(j);
     if(k>=0)answers[i].splice(k,1);else answers[i].push(j);
     answers[i].sort();
@@ -327,8 +350,8 @@ function pick(i,j){
 function submitQuiz(){
   var un=answers.filter(function(a){return Array.isArray(a)?!a.length:a<0}).length;
   if(un>0&&!confirm("还有 "+un+" 题没答，确定提交吗？"))return;
-  var per=100/CUR.questions.length,score=0,detail=[];
-  CUR.questions.forEach(function(q,i){
+  var per=100/EXAM_QS.length,score=0,detail=[];
+  EXAM_QS.forEach(function(q,i){
     var my=Array.isArray(answers[i])?answers[i].slice():answers[i];
     var ok=Array.isArray(my)?(my.length===q.ans.length&&my.every(function(v,k){return v===q.ans[k]})):my===q.ans[0];
     if(ok)score+=per;
@@ -366,7 +389,7 @@ function renderResult(rec){
     '<div class="score">'+rec.score+'</div><div style="font-size:13px;color:#999">满分 100</div>'+
     '<div class="pass '+(pass?'y':'n')+'">'+(pass?'✔ 合格':'✘ 不合格')+'（分数线 '+pl+' 分）</div>';
   var h="";
-  CUR.questions.forEach(function(q,i){
+  EXAM_QS.forEach(function(q,i){
     var d=rec.detail[i];
     var myTxt=Array.isArray(d.my)?(d.my.length?d.my.map(function(v){return "ABCD"[v]}).join(""):"未作答"):(d.my<0?"未作答":"ABCD"[d.my]);
     var okTxt=q.ans.map(function(v){return "ABCD"[v]}).join("");
@@ -432,17 +455,21 @@ function renderPaperAdmin(){
   PAPERS.forEach(function(p){
     var st=pState(p);
     h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
-       '<div class="pm">'+qTypeSummary(p.questions)+'　'+p.questions.length+' 题　每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分'+
+       '<div class="pm">'+qTypeSummary(p.questions)+'　题库 '+p.questions.length+' 题'+(p.draw>0?'　<em style="color:#34618e;font-style:normal">随机抽 '+p.draw+' 题</em>':'')+
+       (p.shuffleQ?'　<em style="color:#34618e;font-style:normal">乱序题</em>':'')+(p.shuffleO?'　<em style="color:#34618e;font-style:normal">乱序选项</em>':'')+
+       '　每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分'+
        (p.closeT?'　截止 '+fmtT(p.closeT):'')+(p.showAns===false?'　<em style="color:#c78a00;font-style:normal">不公布答案</em>':'')+'</div>'+
        '<div class="row"><button class="btn small" onclick="editPaper(\''+p.id+'\')">✎ 编辑</button>'+
+       '<button class="btn small green" onclick="copyExamLink(\''+p.id+'\')">🔗 复制考试链接</button>'+
        '<button class="btn small gray" onclick="dupPaper(\''+p.id+'\')">⧉ 复制</button>'+
        '<button class="btn small red" onclick="delPaper(\''+p.id+'\')">🗑 删除</button></div></div>';
   });
   document.getElementById("paperAdminList").innerHTML=h;
 }
+function newCode(){return Math.random().toString(36).slice(2,8)}
 function editPaper(id){
-  if(id){EDIT=JSON.parse(JSON.stringify(PAPERS.filter(function(x){return x.id===id})[0]))}
-  else EDIT={id:"p"+Date.now(),title:"",openT:"",closeT:"",tries:1,passLine:60,showAns:true,questions:[]};
+  if(id){EDIT=JSON.parse(JSON.stringify(PAPERS.filter(function(x){return x.id===id})[0]));if(!EDIT.code)EDIT.code=newCode()}
+  else EDIT={id:"p"+Date.now(),code:newCode(),title:"",openT:"",closeT:"",tries:1,passLine:60,showAns:true,draw:0,shuffleQ:false,shuffleO:false,questions:[]};
   loadCfgToForm();
   document.getElementById("tabEdit").classList.remove("hide");
   document.getElementById("tabPapers").classList.add("hide");
@@ -450,9 +477,18 @@ function editPaper(id){
   window.scrollTo(0,0);
 }
 function cancelEdit(){document.getElementById("tabEdit").classList.add("hide");document.getElementById("tabPapers").classList.remove("hide");document.getElementById("tabB1").className="btn small";renderPaperAdmin()}
+function copyExamLink(id){
+  var p=PAPERS.filter(function(x){return x.id===id})[0];if(!p)return;
+  var link=location.href.split(/[?#]/)[0]+"?exam="+(p.code||p.id);
+  if(!p.code){p.code=p.id}
+  var tip=document.getElementById("papersTip");
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(link).then(function(){tip.textContent="🔗 链接已复制："+link},function(){prompt("复制下面的考试链接发给老师/学生：",link)});
+  }else prompt("复制下面的考试链接发给老师/学生：",link);
+}
 function dupPaper(id){
   var p=JSON.parse(JSON.stringify(PAPERS.filter(function(x){return x.id===id})[0]));
-  p.id="p"+Date.now();p.title=p.title+"（副本）";
+  p.id="p"+Date.now();p.code=newCode();p.title=p.title+"（副本）";
   PAPERS.push(p);savePapers(PAPERS,document.getElementById("papersTip"),"✔ 已复制").then(function(ok){if(ok){loadPapers(function(){renderPaperAdmin()})}});
 }
 function delPaper(id){
@@ -489,6 +525,9 @@ function loadCfgToForm(){
   document.getElementById("cfgTries").value=EDIT.tries||1;
   document.getElementById("cfgPass").value=EDIT.passLine!=null?EDIT.passLine:60;
   document.getElementById("cfgShowAns").checked=EDIT.showAns!==false;
+  document.getElementById("cfgDraw").value=EDIT.draw||0;
+  document.getElementById("cfgShufQ").checked=!!EDIT.shuffleQ;
+  document.getElementById("cfgShufO").checked=!!EDIT.shuffleO;
   updQList();
 }
 function addQ(t){EDIT.questions.push(blankQ(t));updQList()}
@@ -510,6 +549,10 @@ function savePaper(){
   EDIT.tries=Math.max(1,parseInt(document.getElementById("cfgTries").value,10)||1);
   EDIT.passLine=parseInt(document.getElementById("cfgPass").value,10);
   EDIT.showAns=document.getElementById("cfgShowAns").checked;
+  EDIT.draw=Math.max(0,parseInt(document.getElementById("cfgDraw").value,10)||0);
+  EDIT.shuffleQ=document.getElementById("cfgShufQ").checked;
+  EDIT.shuffleO=document.getElementById("cfgShufO").checked;
+  if(EDIT.draw>EDIT.questions.length){alert("抽题数（"+EDIT.draw+"）不能大于题库题数（"+EDIT.questions.length+"）");return}
   if(!EDIT.questions.length){alert("至少要有一道题");return}
   if(EDIT.questions.some(function(q){return !q.q.trim()})){alert("有题目没写内容");return}
   if(EDIT.questions.some(function(q){return !q.ans.length})){alert("有题目没勾选正确答案");return}
@@ -625,7 +668,16 @@ function exportCSV(){
 /* ================= 启动 ================= */
 document.getElementById("pwdInput").addEventListener("keydown",function(e){if(e.key==="Enter")adminLogin()});
 document.getElementById("nameInput").addEventListener("keydown",function(e){if(e.key==="Enter")startExam()});
-loadPapers(function(list){PAPERS=list;renderHome()});
+loadPapers(function(list){
+  PAPERS=list;renderHome();
+  /* 专属考试链接：?exam=卷子码 → 直接进入该卷 */
+  var m=location.search.match(/[?&]exam=([A-Za-z0-9]+)/);
+  if(m){
+    var dp=PAPERS.filter(function(x){return (x.code||x.id)===m[1]})[0];
+    if(dp)openPaper(dp.id);
+    else{alert("考试链接无效或该考试已删除");show("pgHome")}
+  }
+});
 </script>
 </body>
 </html>
