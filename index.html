@@ -22,9 +22,9 @@ input[type=checkbox]{accent-color:var(--main)}
 .btn:active{background:var(--main-d)}
 .btn.gray{background:#fff;color:#4a5264;border:1px solid var(--line)}
 .btn.gray:active{background:#f5f7fa}
-.btn.green{background:var(--ok)}
-.btn.green:active{background:#0f7a3e}
-.btn.red{background:#fff;color:var(--no);border:1px solid #f3c6c6}
+.btn.green{background:#fff;color:var(--main);border:1px solid #c9d6ef}
+.btn.green:active{background:#f5f8fd}
+.btn.red{background:#fff;color:var(--no);border:1px solid var(--line)}
 .btn.small{width:auto;display:inline-block;padding:7px 14px;font-size:13px;margin-top:0;border-radius:6px;letter-spacing:0}
 .btn:disabled{opacity:.45;cursor:default}
 .paper{border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;background:#fff;cursor:pointer;transition:border .15s,box-shadow .15s;position:relative;overflow:hidden}
@@ -32,13 +32,13 @@ input[type=checkbox]{accent-color:var(--main)}
 .paper::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--main);opacity:.85}
 .paper .pt{font-size:16px;font-weight:600;margin-bottom:8px;line-height:1.5}
 .paper .pm{font-size:13px;color:var(--sub);line-height:1.9}
-.paper em{font-style:normal;background:var(--main-l);color:var(--main);border-radius:4px;padding:1px 6px;font-size:12px;margin-right:2px}
-.st{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-left:8px;vertical-align:2px}
-.st.ing{background:#e5f6ec;color:var(--ok)}
-.st.early{background:#fdf3e0;color:var(--warn)}
+.paper em{font-style:normal;color:#8a93a5;font-size:12px;margin-right:2px}
+.st{display:inline-block;font-size:12px;margin-left:8px;vertical-align:2px;color:#98a0ae;font-weight:400}
+.st.ing{color:var(--ok)}
+.st.early{color:var(--warn)}
 .st.over{background:#f0f1f4;color:#98a0ae}
 .q-tit{font-size:15px;font-weight:600;line-height:1.7;margin-bottom:14px}
-.q-num{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;background:var(--main);color:#fff;font-size:13px;border-radius:6px;padding:0 7px;margin-right:8px;vertical-align:1px;font-weight:700}
+.q-num{display:inline-block;color:var(--main);font-weight:700;margin-right:6px}
 .opt{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:8px;padding:12px 13px;margin-bottom:9px;font-size:15px;line-height:1.6;cursor:pointer;transition:all .12s;background:#fff}
 .opt:hover{border-color:#b9c8ea}
 .opt .tag{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid #c9d0dc;display:flex;align-items:center;justify-content:center;font-size:13px;color:#5a6375;font-weight:600;transition:all .12s}
@@ -86,7 +86,7 @@ tr:nth-child(even) td{background:#fafbfe}
   <h1 data-page-node-id="TznQGzqGqecMeSpdIJgnpw">在线考试</h1>
   <div class="sub" data-page-node-id="w39G0YcdyCCmTOUxwL2IbW">选择一张卷子开始答题</div>
   <div id="paperList" data-page-node-id="USMOqUOR7S21lVp43rE78D"></div>
-  <div class="row" style="justify-content:space-between;align-items:center;margin-top:16px"><span class="link" style="margin-top:0" onclick="reloadHome()">↻ 刷新考试列表</span><span class="link" style="margin-top:0" onclick="showAdmin()">后台管理</span></div>
+  <div class="row" style="justify-content:space-between;align-items:center;margin-top:16px"><span class="link" style="margin-top:0" onclick="reloadHome()">刷新考试列表</span><span class="link" style="margin-top:0" onclick="showAdmin()">后台管理</span></div>
 </div>
 
 <!-- 输入姓名 -->
@@ -141,7 +141,7 @@ tr:nth-child(even) td{background:#fafbfe}
   <!-- 试卷列表 -->
   <div id="tabPapers" data-page-node-id="aU7WcxajdgtYbFMqRmUDXV">
     <div class="card" data-page-node-id="2PDJm6MC7FNBdhl3KjVueS">
-      <div class="row" data-page-node-id="EWwjo0g5qPrgD1gwIHXoFc"><button class="btn small green" onclick="editPaper(null)" data-page-node-id="H9VFAJ4O8EO1gdPh2XP5UR">＋ 新建试卷</button>
+      <div class="row" data-page-node-id="EWwjo0g5qPrgD1gwIHXoFc"><button class="btn small green" onclick="editPaper(null)" data-page-node-id="H9VFAJ4O8EO1gdPh2XP5UR">新建试卷</button>
       <button class="btn small" onclick="loadPapers(true)" data-page-node-id="NHW44ojMJ9YVqkcQ72fAD1">刷新</button></div>
       <div class="tip" id="papersTip" style="margin-top:10px" data-page-node-id="4QSaP44cdMDZxQdWZBKNvf"></div>
     </div>
@@ -171,9 +171,9 @@ tr:nth-child(even) td{background:#fafbfe}
       <div style="font-weight:600;margin-bottom:10px" data-page-node-id="KlWVpuB3brXM5ljPHns9UO">题目编辑（<span id="qCount" data-page-node-id="qs3Wd8nnkFqU1gcxcrHbN2">0</span> 题，每题分值 = 100÷题数）</div>
       <div id="qList" data-page-node-id="VJdbEErV4m9HtdlnJQnp23"></div>
       <div class="row" data-page-node-id="PqAKnUd1A4KkhCulUges5i">
-        <button class="btn small" onclick="addQ('single')" data-page-node-id="ojV0DUqe4KmSLVeA6VLNTD">＋单选题</button>
-        <button class="btn small" onclick="addQ('multi')" data-page-node-id="FVpPsXBks9QoTcOJoCzgAl">＋多选题</button>
-        <button class="btn small" onclick="addQ('judge')" data-page-node-id="k7607CmCgUW20yV45FvDWb">＋判断题</button>
+        <button class="btn small" onclick="addQ('single')" data-page-node-id="ojV0DUqe4KmSLVeA6VLNTD">单选题</button>
+        <button class="btn small" onclick="addQ('multi')" data-page-node-id="FVpPsXBks9QoTcOJoCzgAl">多选题</button>
+        <button class="btn small" onclick="addQ('judge')" data-page-node-id="k7607CmCgUW20yV45FvDWb">判断题</button>
       </div>
     </div>
     <div class="card" data-page-node-id="QvyoMiS9yrpUOAvD1RqaEq">
@@ -467,18 +467,18 @@ function switchTab(i){
 /* ================= 试卷管理 ================= */
 function renderPaperAdmin(){
   var h="";
-  if(!PAPERS.length)h='<div class="card"><div class="muted" style="padding:16px">还没有试卷，点上面「＋ 新建试卷」</div></div>';
+  if(!PAPERS.length)h='<div class="card"><div class="muted" style="padding:16px">还没有试卷，点上面「新建试卷」</div></div>';
   PAPERS.forEach(function(p){
     var st=pState(p);
     h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
        '<div class="pm">'+qTypeSummary(p.questions)+'　题库 '+p.questions.length+' 题'+(p.draw>0?'　<em style="color:#34618e;font-style:normal">随机抽 '+p.draw+' 题</em>':'')+
        (p.shuffleQ?'　<em style="color:#34618e;font-style:normal">乱序题</em>':'')+(p.shuffleO?'　<em style="color:#34618e;font-style:normal">乱序选项</em>':'')+
        '　每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分'+
-       (p.closeT?'　截止 '+fmtT(p.closeT):'')+(p.showAns===false?'　<em style="color:#c78a00;font-style:normal">不公布答案</em>':'')+'</div>'+
-       '<div class="row"><button class="btn small" onclick="editPaper(\''+p.id+'\')">✎ 编辑</button>'+
-       '<button class="btn small green" onclick="copyExamLink(\''+p.id+'\')">🔗 复制考试链接</button>'+
-       '<button class="btn small gray" onclick="dupPaper(\''+p.id+'\')">⧉ 复制</button>'+
-       '<button class="btn small red" onclick="delPaper(\''+p.id+'\')">🗑 删除</button></div></div>';
+       (p.closeT?'　截止 '+fmtT(p.closeT):'')+(p.showAns===false?'　<em>不公布答案</em>':'')+'</div>'+
+       '<div class="row"><button class="btn small" onclick="editPaper(\''+p.id+'\')">编辑</button>'+
+       '<button class="btn small green" onclick="copyExamLink(\''+p.id+'\')">复制考试链接</button>'+
+       '<button class="btn small gray" onclick="dupPaper(\''+p.id+'\')">复制</button>'+
+       '<button class="btn small red" onclick="delPaper(\''+p.id+'\')">删除</button></div></div>';
   });
   document.getElementById("paperAdminList").innerHTML=h;
 }
