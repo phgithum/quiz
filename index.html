@@ -211,6 +211,7 @@ function ghH(){return{"Authorization":"Bearer "+TOK1+TOK2,"Accept":"application/
 
 /* ================= 状态 ================= */
 var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,CLOUD=[],EXAM_QS=[],DIRECT=false;
+var CUR_USER="",IS_MASTER=false;
 function localCache(){try{return JSON.parse(localStorage.getItem("quiz_subs")||"[]")}catch(e){return[]}}
 function saveLocalCache(a){try{localStorage.setItem("quiz_subs",JSON.stringify(a))}catch(e){}}
 function show(id){["pgHome","pgName","pgQuiz","pgResult","pgAdminLogin","pgAdmin"].forEach(function(p){document.getElementById(p).classList.add("hide")});document.getElementById(id).classList.remove("hide");window.scrollTo(0,0)}
@@ -427,16 +428,28 @@ function reloadHome(){
 
 /* ================= 登录 ================= */
 function showAdmin(){
-  if(sessionStorage.getItem("quiz_admin")==="1"){enterAdmin()}
+  if(sessionStorage.getItem("quiz_admin")==="1"){
+    CUR_USER=sessionStorage.getItem("quiz_admin_user")||"";
+    IS_MASTER=sessionStorage.getItem("quiz_admin_master")==="1"||(CUR_USER==="panhao");
+    if(!CUR_USER){var w=sessionStorage.getItem("quiz_admin_who")||"";CUR_USER=w.indexOf("panhao")>=0?"panhao":w.replace("账户 ","");IS_MASTER=w.indexOf("超管")>=0}
+    enterAdmin();
+  }
   else{document.getElementById("userInput").value="";document.getElementById("pwdInput").value="";show("pgAdminLogin")}
 }
 function adminLogin(){
   var u=document.getElementById("userInput").value.trim(),p=document.getElementById("pwdInput").value;
-  function pass(who){sessionStorage.setItem("quiz_admin","1");sessionStorage.setItem("quiz_admin_who",who);enterAdmin()}
-  if(u==="panhao"&&p==="panhao123"){pass("超管 panhao");return}
+  function pass(who,user,master){
+    CUR_USER=user;IS_MASTER=!!master;
+    sessionStorage.setItem("quiz_admin","1");
+    sessionStorage.setItem("quiz_admin_who",who);
+    sessionStorage.setItem("quiz_admin_user",user);
+    sessionStorage.setItem("quiz_admin_master",master?"1":"0");
+    enterAdmin();
+  }
+  if(u==="panhao"&&p==="panhao123"){pass("超管 panhao",u,true);return}
   loadAccs(function(list){
     var hit=(list||[]).filter(function(a){return a.u===u&&a.p===p&&a.quiz})[0];
-    if(hit)pass("账户 "+u);
+    if(hit)pass("账户 "+u,u,false);
     else alert("账户或密码错误（或无本系统权限）");
   });
 }
@@ -465,10 +478,15 @@ function switchTab(i){
 }
 
 /* ================= 试卷管理 ================= */
+function myPapers(){
+  if(IS_MASTER)return PAPERS;
+  return PAPERS.filter(function(p){return p.owner===CUR_USER});
+}
 function renderPaperAdmin(){
   var h="";
-  if(!PAPERS.length)h='<div class="card"><div class="muted" style="padding:16px">还没有试卷，点上面「新建试卷」</div></div>';
-  PAPERS.forEach(function(p){
+  var mine=myPapers();
+  if(!mine.length)h='<div class="card"><div class="muted" style="padding:16px">'+(IS_MASTER?"还没有试卷，点上面「新建试卷」":"你还没有试卷，点上面「新建试卷」创建一套")+'</div></div>';
+  mine.forEach(function(p){
     var st=pState(p);
     h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
        '<div class="pm">'+qTypeSummary(p.questions)+'　题库 '+p.questions.length+' 题'+(p.draw>0?'　<em style="color:#34618e;font-style:normal">随机抽 '+p.draw+' 题</em>':'')+
@@ -485,7 +503,7 @@ function renderPaperAdmin(){
 function newCode(){return Math.random().toString(36).slice(2,8)}
 function editPaper(id){
   if(id){EDIT=JSON.parse(JSON.stringify(PAPERS.filter(function(x){return x.id===id})[0]));if(!EDIT.code)EDIT.code=newCode()}
-  else EDIT={id:"p"+Date.now(),code:newCode(),title:"",openT:"",closeT:"",tries:1,passLine:60,showAns:true,draw:0,shuffleQ:false,shuffleO:false,questions:[]};
+  else EDIT={id:"p"+Date.now(),code:newCode(),owner:CUR_USER,title:"",openT:"",closeT:"",tries:1,passLine:60,showAns:true,draw:0,shuffleQ:false,shuffleO:false,questions:[]};
   loadCfgToForm();
   document.getElementById("tabEdit").classList.remove("hide");
   document.getElementById("tabPapers").classList.add("hide");
@@ -504,7 +522,7 @@ function copyExamLink(id){
 }
 function dupPaper(id){
   var p=JSON.parse(JSON.stringify(PAPERS.filter(function(x){return x.id===id})[0]));
-  p.id="p"+Date.now();p.code=newCode();p.title=p.title+"（副本）";
+  p.id="p"+Date.now();p.code=newCode();p.title=p.title+"（副本）";p.owner=CUR_USER;
   PAPERS.push(p);savePapers(PAPERS,document.getElementById("papersTip"),"✔ 已复制").then(function(ok){if(ok){loadPapers(function(){renderPaperAdmin()})}});
 }
 function delPaper(id){
@@ -621,8 +639,14 @@ function loadSubs(manual){
     else{renderAdmin();syncTip(manual?"云端拉取失败，显示本机缓存":"本机缓存")}
   });
 }
-function renderAdmin(){
+function visibleRecs(){
   var all=mergedRecs();
+  if(IS_MASTER)return all;
+  var mine=myPapers().map(function(p){return p.title});
+  return all.filter(function(r){return mine.indexOf(r.paperTitle)>=0});
+}
+function renderAdmin(){
+  var all=visibleRecs();
   document.getElementById("subCount").textContent=all.length;
   // 试卷筛选下拉
   var sel=document.getElementById("paperFilter"),cur=sel.value;
@@ -648,6 +672,7 @@ function renderAdmin(){
   document.getElementById("adminList").innerHTML=h;
 }
 function clearAll(){
+  if(!IS_MASTER){alert("只有超管可以清空全部记录");return}
   if(!confirm("确定清空全部云端答卷记录？此操作不可恢复！"))return;
   syncTip("清空中…");
   fetch(GH+"/contents/data?ref=main",{headers:ghH()}).then(function(r){return r.json()}).then(function(list){
@@ -660,7 +685,7 @@ function clearAll(){
    .catch(function(){syncTip("清空失败，请重试")});
 }
 function exportCSV(){
-  var all=mergedRecs(),f=document.getElementById("paperFilter").value;
+  var all=visibleRecs(),f=document.getElementById("paperFilter").value;
   var view=f?all.filter(function(r){return r.paperTitle===f}):all;
   if(!view.length){alert("暂无记录可导出");return}
   var maxN=Math.max.apply(null,view.map(function(r){return r.detail.length}));
