@@ -6,61 +6,76 @@
 <title>在线考试系统</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f4f5f7;color:#2b2f36;min-height:100vh}
-.page{max-width:540px;margin:0 auto;padding:16px 14px 40px}
-.card{background:#fff;border-radius:6px;padding:18px 16px;box-shadow:0 1px 2px rgba(30,40,60,.08);margin-bottom:14px;border:1px solid #e8eaee}
-h1{font-size:19px;margin:22px 0 4px;padding-left:10px;border-left:4px solid #34618e;line-height:1.3}
-.sub{color:#8a929e;font-size:13px;margin:0 0 18px 14px}
-label{display:block;font-size:14px;color:#555;margin:10px 0 6px}
+:root{--main:#2456c4;--main-d:#1c46a3;--main-l:#eef3fd;--bg:#f2f4f8;--line:#e4e8f0;--tx:#1c2330;--sub:#7b8496;--ok:#159c52;--no:#d93a3a;--warn:#c77d0a}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;font-size:15px}
+.page{max-width:640px;margin:0 auto;padding:20px 16px 56px}
+.card{background:#fff;border-radius:10px;padding:20px 18px;box-shadow:0 1px 3px rgba(20,30,60,.06);margin-bottom:14px;border:1px solid var(--line)}
+h1{font-size:20px;font-weight:700;margin:8px 0 6px;line-height:1.35}
+.sub{color:var(--sub);font-size:13px;margin:0 0 20px}
+label{display:block;font-size:13px;color:#4a5264;font-weight:500;margin:14px 0 6px}
 label:first-child{margin-top:0}
-input[type=text],input[type=datetime-local],input[type=number],select,textarea{width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:16px;outline:none;background:#fff;font-family:inherit}
-textarea{min-height:64px;resize:vertical;font-size:14px}
-input:focus,select:focus,textarea:focus{border-color:#34618e;box-shadow:0 0 0 2px rgba(52,97,142,.12)}
-.btn{display:block;width:100%;padding:13px;border:none;border-radius:6px;font-size:16px;font-weight:600;background:#34618e;color:#fff;margin-top:16px;cursor:pointer;letter-spacing:1px}
-.btn:active{opacity:.85}
-.btn.gray{background:#eee;color:#666}
-.btn.green{background:#18a058}
-.btn.small{width:auto;display:inline-block;padding:8px 16px;font-size:13px;margin-top:0}
-.btn:disabled{opacity:.5}
-.paper{border:1px solid #e0e3e8;border-radius:6px;padding:14px 15px;margin-bottom:10px;background:#fff;cursor:pointer;transition:border .15s,box-shadow .15s}
-.paper:active{border-color:#34618e;box-shadow:0 1px 4px rgba(52,97,142,.15)}
-.paper .pt{font-size:16px;font-weight:600;margin-bottom:6px}
-.paper .pm{font-size:13px;color:#888;line-height:1.7}
-.st{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;margin-left:8px;vertical-align:2px}
-.st.ing{background:#e6f7ec;color:#18a058}
-.st.early{background:#fff7e0;color:#c78a00}
-.st.over{background:#f2f2f2;color:#999}
-.q-tit{font-size:15px;font-weight:600;line-height:1.6;margin-bottom:12px}
-.q-num{display:inline-block;background:#eef2f7;color:#34618e;font-size:12px;border-radius:3px;padding:2px 7px;margin-right:8px;vertical-align:2px;font-weight:700}
-.opt{display:flex;align-items:flex-start;gap:10px;border:1px solid #e0e3e8;border-radius:4px;padding:11px 12px;margin-bottom:8px;font-size:15px;line-height:1.5;cursor:pointer;transition:all .15s}
-.opt .tag{flex:none;width:24px;height:24px;border-radius:3px;border:1px solid #c8cdd6;display:flex;align-items:center;justify-content:center;font-size:13px;color:#666;font-weight:600}
-.opt.sel{border-color:#34618e;background:#eef4ff}
-.opt.sel .tag{background:#34618e;border-color:#34618e;color:#fff}
-.score{font-size:40px;font-weight:700;color:#2b2f36;font-variant-numeric:tabular-nums}
-.pass{display:inline-block;margin-top:8px;padding:4px 16px;border-radius:20px;font-size:14px;font-weight:600}
-.pass.y{background:#e6f7ec;color:#18a058}
-.pass.n{background:#fdeaea;color:#d93535}
-.ans-item{display:flex;gap:10px;padding:11px 4px;border-bottom:1px solid #f0f0f0;font-size:14px;line-height:1.5}
+input[type=text],input[type=datetime-local],input[type=number],select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;font-size:15px;outline:none;background:#fff;font-family:inherit;color:var(--tx);transition:border .15s,box-shadow .15s}
+textarea{min-height:68px;resize:vertical;font-size:14px;line-height:1.6}
+input:focus,select:focus,textarea:focus{border-color:var(--main);box-shadow:0 0 0 3px rgba(36,86,196,.1)}
+input[type=checkbox]{accent-color:var(--main)}
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:8px;font-size:15px;font-weight:600;background:var(--main);color:#fff;margin-top:16px;cursor:pointer;letter-spacing:2px;transition:background .15s}
+.btn:active{background:var(--main-d)}
+.btn.gray{background:#fff;color:#4a5264;border:1px solid var(--line)}
+.btn.gray:active{background:#f5f7fa}
+.btn.green{background:var(--ok)}
+.btn.green:active{background:#0f7a3e}
+.btn.red{background:#fff;color:var(--no);border:1px solid #f3c6c6}
+.btn.small{width:auto;display:inline-block;padding:7px 14px;font-size:13px;margin-top:0;border-radius:6px;letter-spacing:0}
+.btn:disabled{opacity:.45;cursor:default}
+.paper{border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px;background:#fff;cursor:pointer;transition:border .15s,box-shadow .15s;position:relative;overflow:hidden}
+.paper:hover{border-color:#c4d2f0;box-shadow:0 3px 10px rgba(36,86,196,.08)}
+.paper::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--main);opacity:.85}
+.paper .pt{font-size:16px;font-weight:600;margin-bottom:8px;line-height:1.5}
+.paper .pm{font-size:13px;color:var(--sub);line-height:1.9}
+.paper em{font-style:normal;background:var(--main-l);color:var(--main);border-radius:4px;padding:1px 6px;font-size:12px;margin-right:2px}
+.st{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;font-weight:600;margin-left:8px;vertical-align:2px}
+.st.ing{background:#e5f6ec;color:var(--ok)}
+.st.early{background:#fdf3e0;color:var(--warn)}
+.st.over{background:#f0f1f4;color:#98a0ae}
+.q-tit{font-size:15px;font-weight:600;line-height:1.7;margin-bottom:14px}
+.q-num{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;background:var(--main);color:#fff;font-size:13px;border-radius:6px;padding:0 7px;margin-right:8px;vertical-align:1px;font-weight:700}
+.opt{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--line);border-radius:8px;padding:12px 13px;margin-bottom:9px;font-size:15px;line-height:1.6;cursor:pointer;transition:all .12s;background:#fff}
+.opt:hover{border-color:#b9c8ea}
+.opt .tag{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid #c9d0dc;display:flex;align-items:center;justify-content:center;font-size:13px;color:#5a6375;font-weight:600;transition:all .12s}
+.opt.sel{border-color:var(--main);background:var(--main-l);box-shadow:inset 0 0 0 1px var(--main)}
+.opt.sel .tag{background:var(--main);border-color:var(--main);color:#fff}
+.score{font-size:48px;font-weight:700;color:var(--main);font-variant-numeric:tabular-nums;line-height:1.2}
+.pass{display:inline-block;margin-top:10px;padding:5px 18px;border-radius:99px;font-size:14px;font-weight:600}
+.pass.y{background:#e5f6ec;color:var(--ok)}
+.pass.n{background:#fdeaea;color:var(--no)}
+.ans-item{display:flex;gap:10px;padding:12px 4px;border-bottom:1px solid #f0f2f6;font-size:14px;line-height:1.7}
 .ans-item:last-child{border-bottom:none}
-.ans-item .ok{color:#18a058;font-weight:600;flex:none}
-.ans-item .no{color:#d93535;font-weight:600;flex:none}
-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
-th,td{border:1px solid #e3e6ee;padding:6px 4px;text-align:center;word-break:break-all}
-th{background:#f7f9fc}
-.row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.ans-item .ok{color:var(--ok);font-weight:600;flex:none}
+.ans-item .no{color:var(--no);font-weight:600;flex:none}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+th,td{border:1px solid var(--line);padding:7px 5px;text-align:center;word-break:break-all}
+th{background:#f6f8fc;color:#4a5264;font-weight:600}
+tr:nth-child(even) td{background:#fafbfe}
+.row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 .row .btn{margin-top:0}
-.muted{color:#999;font-size:12px;text-align:center;margin-top:10px}
-.tip{color:#34618e;font-size:13px}
-.warn{color:#d93535;font-size:13px}
-.link{color:#34618e;font-size:13px;text-align:center;margin-top:18px;cursor:pointer;text-decoration:underline}
-.tabs{display:flex;gap:8px;margin-bottom:14px}
-.tabs .btn{margin-top:0}
-.qedit{border:1px solid #e0e3e8;border-radius:4px;padding:12px;margin-bottom:12px;background:#fafbfd}
-.qedit .del{color:#d93535;font-size:12px;cursor:pointer;text-decoration:underline;float:right}
+.muted{color:#9aa2b1;font-size:12px;text-align:center;margin-top:10px}
+.tip{color:var(--main);font-size:13px}
+.warn{color:var(--no);font-size:13px}
+.link{color:var(--main);font-size:13px;text-align:center;margin-top:20px;cursor:pointer}
+.link:hover{text-decoration:underline}
+.tabs{display:flex;gap:22px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.tabs .btn{width:auto;background:none;color:var(--sub);border:none;border-radius:0;padding:10px 2px;font-size:15px;font-weight:600;letter-spacing:0;margin:0;position:relative}
+.tabs .btn:active{background:none}
+.tabs .btn.gray{color:var(--sub);border:none;background:none}
+.tabs .btn:not(.gray){color:var(--main)}
+.tabs .btn:not(.gray)::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2.5px;background:var(--main);border-radius:2px}
+.qedit{border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:12px;background:#fafbfd}
+.qedit .del{color:var(--no);font-size:12px;cursor:pointer;float:right}
+.qedit .del:hover{text-decoration:underline}
 .optrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.optrow input[type=text]{flex:1;padding:8px;font-size:14px}
-.optrow .ck{flex:none;display:flex;align-items:center;gap:4px;font-size:12px;color:#18a058}
-.info-box{background:#f4f6f9;border-radius:4px;padding:12px 14px;font-size:13px;color:#44506b;line-height:1.8;border-left:3px solid #34618e}
+.optrow input[type=text]{flex:1;padding:8px 10px;font-size:14px}
+.optrow .ck{flex:none;display:flex;align-items:center;gap:4px;font-size:12px;color:var(--ok)}
+.info-box{background:var(--main-l);border-radius:8px;padding:12px 14px;font-size:13px;color:#33415e;line-height:1.9;border-left:3px solid var(--main)}
 .hide{display:none}
 </style>
 </head>
@@ -84,7 +99,7 @@ th{background:#f7f9fc}
     <input type="text" id="nameInput" placeholder="输入你的编号或姓名" maxlength="20" data-page-node-id="MDllqGQgsmkIxgm562baAG">
     <button class="btn" id="startBtn" onclick="startExam()" data-page-node-id="tVdlS8qh9jLuejAQXXkk7C">开始答题</button>
   </div>
-  <div class="link" onclick="backHome()" data-page-node-id="d6WpPI4Dnzis7o4sdhcySD">返回选择卷子</div>
+  <div class="link" id="backLink" onclick="backHome()" data-page-node-id="d6WpPI4Dnzis7o4sdhcySD">返回选择卷子</div>
 </div>
 
 <!-- 答题页 -->
@@ -195,7 +210,7 @@ var RAW="https://raw.githubusercontent.com/phgithum/cloud-db/main";
 function ghH(){return{"Authorization":"Bearer "+TOK1+TOK2,"Accept":"application/vnd.github+json","Content-Type":"application/json","User-Agent":"quiz-h5"}}
 
 /* ================= 状态 ================= */
-var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,CLOUD=[],EXAM_QS=[];
+var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,CLOUD=[],EXAM_QS=[],DIRECT=false;
 function localCache(){try{return JSON.parse(localStorage.getItem("quiz_subs")||"[]")}catch(e){return[]}}
 function saveLocalCache(a){try{localStorage.setItem("quiz_subs",JSON.stringify(a))}catch(e){}}
 function show(id){["pgHome","pgName","pgQuiz","pgResult","pgAdminLogin","pgAdmin"].forEach(function(p){document.getElementById(p).classList.add("hide")});document.getElementById(id).classList.remove("hide");window.scrollTo(0,0)}
@@ -285,6 +300,7 @@ function openPaper(id){
   document.getElementById("startBtn").disabled=(st!=="ing");
   document.getElementById("pInfo").innerHTML=info.join("<br>");
   document.getElementById("nameInput").value="";
+  document.getElementById("backLink").style.display=DIRECT?"none":"";
   show("pgName");
 }
 function shuffleArr(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
@@ -665,6 +681,17 @@ function exportCSV(){
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},800);
 }
 
+/* ================= 专属链接锁死 ================= */
+function forceExit(msg){
+  document.querySelectorAll(".page").forEach(function(p){p.classList.add("hide")});
+  var d=document.createElement("div");
+  d.style.cssText="position:fixed;inset:0;background:#f2f4f8;display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px";
+  d.innerHTML='<div style="background:#fff;border:1px solid #e4e8f0;border-radius:12px;padding:38px 30px;width:320px;max-width:100%;text-align:center;box-shadow:0 4px 18px rgba(20,30,60,.08)">'+
+    '<div style="font-size:40px">🔒</div>'+
+    '<div style="font-size:16px;font-weight:600;margin:14px 0 8px">无法进入考试</div>'+
+    '<div style="font-size:13px;color:#7b8496;line-height:1.9">'+msg+'</div></div>';
+  document.body.appendChild(d);
+}
 /* ================= 启动 ================= */
 document.getElementById("pwdInput").addEventListener("keydown",function(e){if(e.key==="Enter")adminLogin()});
 document.getElementById("nameInput").addEventListener("keydown",function(e){if(e.key==="Enter")startExam()});
@@ -673,9 +700,11 @@ loadPapers(function(list){
   /* 专属考试链接：?exam=卷子码 → 直接进入该卷 */
   var m=location.search.match(/[?&]exam=([A-Za-z0-9]+)/);
   if(m){
+    DIRECT=true;
     var dp=PAPERS.filter(function(x){return (x.code||x.id)===m[1]})[0];
-    if(dp)openPaper(dp.id);
-    else{alert("考试链接无效或该考试已删除");show("pgHome")}
+    if(!dp){forceExit("考试链接无效或该考试已删除。<br>请联系老师获取新的考试链接。");return}
+    if(pState(dp)==="over"){forceExit("该考试已于 "+fmtT(dp.closeT)+" 结束，不能再进入。");return}
+    openPaper(dp.id);
   }
 });
 </script>
