@@ -118,7 +118,7 @@ tr:nth-child(even) td{background:#fafbfe}
 <!-- 后台登录 -->
 <div id="pgAdminLogin" class="page hide" data-page-node-id="vzT0RQufGkqJG5zfLyTYDN">
   <h1 data-page-node-id="wR3CQqFwJMj6OoNsV6xs19">后台管理</h1>
-  <div class="sub" data-page-node-id="3quu6uZWHrw1l0TAZ5fZ0x">请使用聚合后台账户登录</div>
+  <div class="sub" data-page-node-id="3quu6uZWHrw1l0TAZ5fZ0x">请使用聚合后台账户登录 · <span id="verTag"></span></div>
   <div class="card" data-page-node-id="ddJp8bCeuPkNwzX89zSYj7">
     <label data-page-node-id="5I7VMTDxXJUpFvCDTdRERx">账户（超管填 panhao）</label>
     <input type="text" id="userInput" placeholder="账户名" data-page-node-id="prdov4ZvhqRAAGqKxXC6uJ">
@@ -448,7 +448,7 @@ function adminLogin(){
   }
   if(u==="panhao"&&p==="panhao123"){pass("超管 panhao",u,true);return}
   loadAccs(function(list){
-    var hit=(list||[]).filter(function(a){return a.u===u&&a.p===p&&a.quiz})[0];
+    var hit=(list||[]).filter(function(a){return a.u===u&&a.p===p&&a.quiz!==false})[0];
     if(hit)pass("账户 "+u,u,false);
     else alert("账户或密码错误（或无本系统权限）");
   });
@@ -463,8 +463,10 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
+var QUIZ_VER="V20260910c";
+try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
-  document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who");
+  document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
   show("pgAdmin");switchTab(0);renderPaperAdmin();loadSubs(true);
 }
 function refreshAfterHome(){}
