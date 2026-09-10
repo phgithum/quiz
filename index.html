@@ -192,11 +192,13 @@ tr:nth-child(even) td{background:#fafbfe}
       <label data-page-node-id="J9enu3bDDGzTFkkEbAOqsi">按试卷筛选</label>
       <select id="paperFilter" onchange="renderAdmin()" data-page-node-id="hEpBhnZMgk5SkCPc6eOyIV"><option value="" data-page-node-id="tlXgBpLHW7zde4QxSxd6hR">全部试卷</option></select>
       <div class="row" data-page-node-id="7CpHNiFKCK5GmUIY2AY5bp">
-        <button class="btn small" style="background:#18a058" onclick="exportCSV()" data-page-node-id="1EhAYDuqc1sfHj9YO267uA">导出Excel(CSV)</button>
+        <button class="btn small" style="background:#18a058" onclick="exportCSV()" data-page-node-id="1EhAYDuqc1sfHj9YO267uA">导出成绩(CSV)</button>
+        <button class="btn small" onclick="exportWrong()" data-page-node-id="1EhAYDuqc2wrong">导出错题(CSV)</button>
         <button class="btn small" onclick="loadSubs(true)" data-page-node-id="EGWr5TVQ7CeESteFE3UmVn">刷新数据</button>
         <button class="btn small gray" onclick="clearAll()" data-page-node-id="DKr5T85DUPNIibwAuEABu7">清空记录</button>
       </div>
     </div>
+    <div class="card" id="statBox"></div>
     <div class="card" id="adminList" data-page-node-id="xX4p1ZCAaLISIRCIRhtHlD"></div>
   </div>
   <div class="link" onclick="backHome()" data-page-node-id="Kl627ACsBteymjXjGRzhEX">返回首页</div>
@@ -372,7 +374,7 @@ function submitQuiz(){
     var my=Array.isArray(answers[i])?answers[i].slice():answers[i];
     var ok=Array.isArray(my)?(my.length===q.ans.length&&my.every(function(v,k){return v===q.ans[k]})):my===q.ans[0];
     if(ok)score+=per;
-    detail.push({ok:ok,my:my});
+    detail.push({ok:ok,my:my,q:q.q,opts:q.opts,ans:q.ans});
   });
   score=Math.round(score*10)/10;
   var rec={name:studentName,paperId:CUR.id,paperTitle:CUR.title,time:new Date().toLocaleString("zh-CN",{hour12:false}),ts:Date.now(),score:score,detail:detail};
@@ -463,7 +465,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260910c";
+var QUIZ_VER="V20260910d";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -659,6 +661,7 @@ function renderAdmin(){
   var view=f?all.filter(function(r){return r.paperTitle===f}):all;
   var pl=(f?(PAPERS.filter(function(p){return p.title===f})[0]||{}).passLine:null);
   if(pl==null)pl=60;
+  renderStats(f,view);
   if(!view.length){document.getElementById("adminList").innerHTML='<div class="muted" style="padding:20px">暂无答卷记录</div>';return}
   var h='<table><tr><th>姓名</th><th>试卷</th><th>提交时间</th><th>得分</th><th>判定</th><th>每题作答</th></tr>';
   view.forEach(function(r){
@@ -685,6 +688,78 @@ function clearAll(){
     }));
   }).then(function(){saveLocalCache([]);CLOUD=[];renderAdmin();syncTip("已清空 ✓")})
    .catch(function(){syncTip("清空失败，请重试")});
+}
+function renderStats(f,view){
+  var box=document.getElementById("statBox");
+  if(!view.length){box.innerHTML='<h2 style="font-size:14px">分析看板</h2><div class="muted" style="padding:8px 0">暂无数据</div>';return}
+  var scores=view.map(function(r){return r.score});
+  var avg=Math.round(scores.reduce(function(a,b){return a+b},0)/scores.length*10)/10;
+  var hi=Math.max.apply(null,scores), lo=Math.min.apply(null,scores);
+  var pass=0;
+  if(f){var pw=PAPERS.filter(function(p){return p.title===f})[0]||{};var pl=pw.passLine!=null?pw.passLine:60;
+    pass=Math.round(view.filter(function(r){return r.score>=pl}).length/view.length*100);
+    var h2='<h2 style="font-size:15px">'+esc(f)+' · 整体概况</h2>';
+    h2+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px">';
+    [["答题人数",view.length],["平均分",avg],["最高分",hi],["最低分",lo],["及格率",pass+"%"],["合格线",pl+" 分"]].forEach(function(kv){
+      h2+='<div><div style="font-size:12px;color:#7b8496">'+kv[0]+'</div><div style="font-size:22px;font-weight:700;color:#2456c4">'+kv[1]+'</div></div>';
+    });
+    h2+='</div>';
+    /* 每题正确率（有题目文本的记录才参与，兼容旧数据） */
+    var qs={}; /* q文本 -> {ok:0,n:0} */
+    view.forEach(function(r){ r.detail.forEach(function(d){
+      if(!d.q)return; var k=d.q; qs[k]=qs[k]||{ok:0,n:0,opts:d.opts,ans:d.ans}; qs[k].n++; if(d.ok)qs[k].ok++;
+    })});
+    var arr=Object.keys(qs).map(function(k){return {q:k,ok:qs[k].ok,n:qs[k].n,rate:Math.round(qs[k].ok/qs[k].n*100),opts:qs[k].opts,ans:qs[k].ans}});
+    if(arr.length){
+      arr.sort(function(a,b){return a.rate-b.rate});
+      h2+='<div style="margin-top:14px;font-size:13px;font-weight:600">每题正确率（错得最多的排前面）</div>';
+      h2+='<table style="margin-top:6px"><thead><tr><th style="width:36px">题号</th><th style="text-align:left">题目</th><th style="width:120px">正确率</th><th style="width:70px">答错人数</th></tr></thead><tbody>';
+      arr.forEach(function(x,i){
+        var col=x.rate>=80?"#159c52":(x.rate>=50?"#c77d0a":"#d93a3a");
+        var ansStr=(x.ans||[]).map(function(v){return "ABCD"[v]}).join("");
+        h2+='<tr><td>'+(i+1)+'</td><td style="text-align:left">'+esc(String(x.q).slice(0,40))+(ansStr?'<span style="color:#889;font-size:11px">（正确答案:'+ansStr+'）</span>':'')+'</td>'
+          +'<td><div style="background:#eef1f6;border-radius:4px;overflow:hidden"><div style="width:'+x.rate+'%;height:14px;background:'+col+'"></div></div><span style="font-size:11px;color:'+col+'">'+x.rate+'%</span></td>'
+          +'<td>'+(x.n-x.ok)+'</td></tr>';
+      });
+      h2+='</tbody></table>';
+    } else h2+='<div style="margin-top:12px;font-size:12px;color:#99a">这批答卷提交于旧版本（无逐题详情），升级后新提交的答卷会有每题正确率分析</div>';
+    box.innerHTML=h2;
+  } else {
+    var byPaper={};
+    view.forEach(function(r){ var k=r.paperTitle||"未知试卷"; byPaper[k]=byPaper[k]||[]; byPaper[k].push(r.score); });
+    var h2='<h2 style="font-size:15px">各试卷概况（选择单张试卷看详细看板）</h2><table style="margin-top:8px"><thead><tr><th style="text-align:left">试卷</th><th>人数</th><th>平均分</th><th>最高</th><th>最低</th></tr></thead><tbody>';
+    Object.keys(byPaper).forEach(function(k){
+      var ss=byPaper[k];
+      h2+='<tr><td style="text-align:left">'+esc(k)+'</td><td>'+ss.length+'</td><td><b>'+Math.round(ss.reduce(function(a,b){return a+b},0)/ss.length*10)/10+'</b></td><td>'+Math.max.apply(null,ss)+'</td><td>'+Math.min.apply(null,ss)+'</td></tr>';
+    });
+    box.innerHTML=h2+'</tbody></table>';
+  }
+}
+function exportWrong(){
+  var all=visibleRecs(),f=document.getElementById("paperFilter").value;
+  var view=f?all.filter(function(r){return r.paperTitle===f}):all;
+  if(!view.length){alert("暂无记录可导出");return}
+  var qs={};
+  view.forEach(function(r){ r.detail.forEach(function(d){
+    var k=(r.paperTitle||"未知试卷")+"||"+(d.q||"");
+    qs[k]=qs[k]||{paper:r.paperTitle||"未知试卷",q:d.q,ok:0,n:0,who:[]};
+    qs[k].n++; if(d.ok)qs[k].ok++; else qs[k].who.push(r.name);
+  })});
+  var rows=[["试卷","题号","题目","作答人数","答对人数","正确率","答错学生"]];
+  var idx={};
+  Object.keys(qs).forEach(function(k){
+    var x=qs[k]; if(!x.q)return;
+    idx[x.paper]=idx[x.paper]||0; idx[x.paper]++;
+    rows.push([x.paper,"第"+idx[x.paper]+"题",x.q,x.n,x.ok,Math.round(x.ok/x.n*100)+"%",x.who.join("、")]);
+  });
+  if(rows.length===1){alert("这批答卷是旧版本提交的（无逐题详情），无法导出错题；升级后新提交的答卷可以导出");return}
+  var csv="\uFEFF"+rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"'}).join(",")}).join("\r\n");
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="错题分析_"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},800);
 }
 function exportCSV(){
   var all=visibleRecs(),f=document.getElementById("paperFilter").value;
