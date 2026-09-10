@@ -175,6 +175,8 @@ tr:nth-child(even) td{background:#fafbfe}
         <button class="btn small" onclick="addQ('single')">单选题</button>
         <button class="btn small" onclick="addQ('multi')">多选题</button>
         <button class="btn small" onclick="addQ('judge')">判断题</button>
+        <button class="btn small" onclick="addQ('blank')">填空题</button>
+        <button class="btn small" style="background:#c77d0a" onclick="addQ('survey')">调研题</button>
       </div>
     </div>
     <div class="card">
@@ -225,13 +227,13 @@ var RAW="https://raw.githubusercontent.com/phgithum/cloud-db/main";
 function ghH(){return{"Authorization":"Bearer "+TOK1+TOK2,"Accept":"application/vnd.github+json","Content-Type":"application/json","User-Agent":"quiz-h5"}}
 
 /* ================= 全局状态 ================= */
-var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,EXAM_QS=[],DIRECT=false;
+var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,EXAM_QS=[],DIRECT=false,otherTexts=[];
 var CUR_USER="",IS_MASTER=false;
 function localCache(){try{return JSON.parse(localStorage.getItem("quiz_subs")||"[]")}catch(e){return[]}}
 function saveLocalCache(a){try{localStorage.setItem("quiz_subs",JSON.stringify(a))}catch(e){}}
 function show(id){["pgHome","pgName","pgQuiz","pgResult","pgAdminLogin","pgAdmin"].forEach(function(p){document.getElementById(p).classList.add("hide")});document.getElementById(id).classList.remove("hide");window.scrollTo(0,0)}
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-var TYPE_NAME={single:"单选",multi:"多选",judge:"判断"};
+var TYPE_NAME={single:"单选",multi:"多选",judge:"判断",blank:"填空",survey:"调研"};
 
 /* 姓名标准化：去首尾空格、压缩连续空格——保证"张三"和"张三 "算同一人 */
 function normName(n){return String(n||"").trim().replace(/\s+/g," ")}
@@ -363,6 +365,7 @@ function buildExam(){
   if(draw>0&&draw<qs.length)shuffleArr(qs).length=draw;else shuffleArr(qs);
   if(CUR.shuffleO){
     qs.forEach(function(q){
+      if(!Array.isArray(q.ans)||!q.ans.length)return; /* 填空/调研无标准答案映射 */
       var idx=shuffleArr(q.opts.map(function(_,i){return i}));
       q.opts=idx.map(function(i){return q.opts[i]});
       q.ans=q.ans.map(function(a){return idx.indexOf(a)}).sort();
@@ -391,7 +394,12 @@ function startExam(){
     document.getElementById("nameHint").textContent="该姓名已答 "+a.used+" / "+tries+" 次，本次为第 "+(a.used+1)+" 次";
     studentName=n;
     EXAM_QS=buildExam();
-    answers=EXAM_QS.map(function(q){return q.type==="multi"?[]:-1});
+    otherTexts=EXAM_QS.map(function(){return ""});
+    answers=EXAM_QS.map(function(q){
+      if(q.type==="blank")return"";
+      if(q.type==="survey")return q.multi?[]:-1;
+      return q.type==="multi"?[]:-1;
+    });
     renderQuiz();show("pgQuiz");
   });
 }
@@ -400,29 +408,60 @@ function startExam(){
 function renderQuiz(){
   var h="";
   EXAM_QS.forEach(function(q,i){
-    h+='<div style="margin-bottom:22px"><div class="q-tit"><span class="q-num">'+(i+1)+'</span>【'+TYPE_NAME[q.type]+'】'+esc(q.q)+'</div>';
-    q.opts.forEach(function(o,j){
-      var sel=Array.isArray(answers[i])?answers[i].indexOf(j)>=0:answers[i]===j;
-      h+='<div class="opt'+(sel?' sel':'')+'" onclick="pick('+i+','+j+')"><span class="tag">'+"ABCD"[j]+'</span><span>'+esc(o)+'</span></div>';
-    });
+    h+='<div style="margin-bottom:22px"><div class="q-tit"><span class="q-num">'+(i+1)+'</span>【'+(q.type==="survey"?TYPE_NAME[q.type]+(q.multi?"·多选":"·单选"):TYPE_NAME[q.type])+'】'+esc(q.q)+
+       (q.type==="survey"?'<span style="font-size:12px;color:#c77d0a;font-weight:400">（调研题，不计分）</span>':'')+'</div>';
+    if(q.type==="blank"){
+      h+='<input type="text" value="'+esc(answers[i])+'" oninput="pickBlank('+i+',this.value)" placeholder="在此输入你的答案">';
+    }else{
+      var opts=q.opts.slice();
+      if(q.type==="survey"&&q.other)opts.push("其他");
+      opts.forEach(function(o,j){
+        var isOther=(q.type==="survey"&&q.other&&j===opts.length-1);
+        var sel=Array.isArray(answers[i])?answers[i].indexOf(j)>=0:answers[i]===j;
+        var mark=isOther?'✎':'';
+        h+='<div class="opt'+(sel?' sel':'')+'" onclick="pick('+i+','+j+')"><span class="tag">'+(isOther?'其他':(q.type==="survey"?(j+1):"ABCD"[j]))+'</span><span>'+esc(o)+'</span></div>';
+        if(isOther&&sel){
+          h+='<div style="margin:-4px 0 10px 36px"><input type="text" value="'+esc(otherTexts[i]||"")+'" oninput="pickOther('+i+',this.value)" placeholder="请填写说明…" onclick="event.stopPropagation()"></div>';
+        }
+      });
+    }
     h+='</div>';
   });
-  var done=answers.filter(function(a){return Array.isArray(a)?a.length:(a>=0)}).length;
+  var done=answers.filter(function(a,i){return qAnswered(EXAM_QS[i],a)}).length;
   h+='<div class="muted">已答 '+done+' / '+EXAM_QS.length+' 题</div>';
   document.getElementById("quizCard").innerHTML=h;
 }
+function qAnswered(q,a){
+  if(q.type==="blank")return !!(a&&String(a).trim());
+  if(q.type==="survey")return Array.isArray(a)?a.length>0:a>=0;
+  return Array.isArray(a)?a.length>0:a>=0;
+}
 function pick(i,j){
-  if(EXAM_QS[i].type==="multi"){
+  var q=EXAM_QS[i];
+  if(q.type==="survey"){
+    if(q.multi){
+      if(!Array.isArray(answers[i]))answers[i]=[];
+      var k=answers[i].indexOf(j);
+      if(k>=0)answers[i].splice(k,1);else answers[i].push(j);
+      answers[i].sort();
+    }else answers[i]=j;
+  }else if(q.type==="multi"){
     var k=answers[i].indexOf(j);
     if(k>=0)answers[i].splice(k,1);else answers[i].push(j);
     answers[i].sort();
   }else answers[i]=j;
   renderQuiz();
 }
+function pickBlank(i,v){answers[i]=v;
+  /* 不重绘，避免输入框失焦 */
+  var done=answers.filter(function(a,i){return qAnswered(EXAM_QS[i],a)}).length;
+  document.querySelector("#quizCard .muted").textContent="已答 "+done+" / "+EXAM_QS.length+" 题";
+}
+function pickOther(i,v){otherTexts[i]=v}
 
 /* ---------- 提交（第二道锁：交卷前云端二次校验） ---------- */
 function submitQuiz(){
-  var un=answers.filter(function(a){return Array.isArray(a)?!a.length:a<0}).length;
+  var un=answers.filter(function(a,i){return !qAnswered(EXAM_QS[i],a)}).length;
   if(un>0&&!confirm("还有 "+un+" 题没答，确定提交吗？"))return;
   var tries=Math.max(1,parseInt(CUR.tries,10)||1);
   var b=document.getElementById("subBtn");b.disabled=true;b.textContent="校验答题次数…";
@@ -440,9 +479,25 @@ function submitQuiz(){
   });
 }
 function doSubmit(){
-  var per=100/EXAM_QS.length,score=0,detail=[];
+  var scoredQ=EXAM_QS.filter(function(q){return q.type!=="survey"});
+  var per=scoredQ.length?100/scoredQ.length:100,score=0,detail=[];
   EXAM_QS.forEach(function(q,i){
     var my=Array.isArray(answers[i])?answers[i].slice():answers[i];
+    if(q.type==="survey"){
+      var labels=(Array.isArray(my)?my:[my]).filter(function(v){return v!=null&&v>=0}).map(function(v){
+        var isO=q.other&&v===q.opts.length;
+        return isO?("其他："+(otherTexts[i]||"").trim()):q.opts[v];
+      });
+      detail.push({survey:true,ok:null,my:labels.join("、"),picks:labels,q:q.q,opts:q.opts,other:otherTexts[i]||""});
+      return;
+    }
+    if(q.type==="blank"){
+      var t=String(my||"").trim(),ref=(q.ans||"").trim();
+      var ok=ref?t.toLowerCase()===ref.toLowerCase():t.length>0;
+      if(ok)score+=per;
+      detail.push({ok:ok,my:t,q:q.q,ans:ref});
+      return;
+    }
     var ok=Array.isArray(my)?(my.length===q.ans.length&&my.every(function(v,k){return v===q.ans[k]})):my===q.ans[0];
     if(ok)score+=per;
     detail.push({ok:ok,my:my,q:q.q,opts:q.opts,ans:q.ans});
@@ -482,6 +537,17 @@ function renderResult(rec){
   var h="";
   EXAM_QS.forEach(function(q,i){
     var d=rec.detail[i];
+    if(q.type==="survey"){
+      h+='<div class="ans-item"><span class="ok" style="color:#c77d0a">◆</span>'+
+         '<span><b>'+(i+1)+'.</b> 【调研】'+esc(q.q)+'<br>你的选择：<b style="color:#33415e">'+(d.my||"未作答")+'</b></span></div>';
+      return;
+    }
+    if(q.type==="blank"){
+      h+='<div class="ans-item"><span class="'+(d.ok?'ok':'no')+'">'+(d.ok?'✔':'✘')+'</span>'+
+         '<span><b>'+(i+1)+'.</b> 【填空】'+esc(q.q)+'<br>你的答案：<b style="color:'+(d.ok?'#18a058':'#d93535')+'">'+esc(d.my||"未作答")+'</b>'+
+         (d.ans?'　参考答案：<b style="color:#18a058">'+esc(d.ans)+'</b>':'')+'</span></div>';
+      return;
+    }
     var myTxt=Array.isArray(d.my)?(d.my.length?d.my.map(function(v){return "ABCD"[v]}).join(""):"未作答"):(d.my<0?"未作答":"ABCD"[d.my]);
     var okTxt=q.ans.map(function(v){return "ABCD"[v]}).join("");
     h+='<div class="ans-item"><span class="'+(d.ok?'ok':'no')+'">'+(d.ok?'✔':'✘')+'</span>'+
@@ -537,7 +603,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260910h";
+var QUIZ_VER="V20260910i";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -653,6 +719,8 @@ function purgeOrphan(t){
 /* ================= 题目编辑 ================= */
 function blankQ(type){
   if(type==="judge")return{type:type,q:"",opts:["正确","错误"],ans:[0]};
+  if(type==="blank")return{type:"blank",q:"",ans:""};
+  if(type==="survey")return{type:"survey",multi:false,q:"",opts:["选项1","选项2","选项3"],other:true};
   return{type:type,q:"",opts:["","","",""],ans:[]};
 }
 function updQList(){
@@ -660,12 +728,28 @@ function updQList(){
   var h="";
   EDIT.questions.forEach(function(q,i){
     h+='<div class="qedit"><span class="del" onclick="delQ('+i+')">删除</span>'+
-       '<div style="font-size:12px;color:#888;margin-bottom:6px">第'+(i+1)+'题 · '+TYPE_NAME[q.type]+'（正确答案：<b style="color:#18a055">'+q.ans.map(function(v){return "ABCD"[v]}).join("")+'</b>）</div>'+
+       '<div style="font-size:12px;color:#888;margin-bottom:6px">第'+(i+1)+'题 · '+TYPE_NAME[q.type]+
+       (q.type==="blank"?'（参考答案：<b style="color:#18a055">'+(q.ans.trim()||"未设，填了即得分")+'</b>）':'')+
+       (q.type==="survey"?'（<b style="color:#c77d0a">调研题不计分</b>，选「'+(q.multi?'多选':'单选')+'」'+(q.other?' · 含「其他」':'')+'）':'')+
+       (q.type==="single"||q.type==="multi"||q.type==="judge"?'（正确答案：<b style="color:#18a055">'+q.ans.map(function(v){return "ABCD"[v]}).join("")+'</b>）':'')+
+       '</div>'+
        '<textarea oninput="updQ('+i+',\'q\',this.value)" placeholder="题目内容">'+esc(q.q)+'</textarea>';
-    q.opts.forEach(function(o,j){
-      h+='<div class="optrow"><span class="ck"><input type="checkbox" '+(q.ans.indexOf(j)>=0?'checked':'')+' onchange="toggleAns('+i+','+j+',this.checked)">正确</span>'+
-         '<input type="text" value="'+esc(o)+'" oninput="updQ('+i+',\'opt'+j+'\',this.value)"></div>';
-    });
+    if(q.type==="blank"){
+      h+='<input type="text" value="'+esc(q.ans)+'" oninput="updQ('+i+',\'ansb\',this.value)" placeholder="参考答案（选填：设了就按答案精确判分，不设则填了即得分）">';
+    }else if(q.type==="survey"){
+      q.opts.forEach(function(o,j){
+        h+='<div class="optrow"><span style="font-size:12px;color:#999;flex:none">'+(j+1)+'.</span>'+
+           '<input type="text" value="'+esc(o)+'" oninput="updQ('+i+',\'opt'+j+'\',this.value)" placeholder="选项内容"></div>';
+      });
+      h+='<div style="font-size:12px;display:flex;gap:16px;margin-top:4px;flex-wrap:wrap">'+
+         '<label style="margin:0;font-weight:400;display:flex;align-items:center;gap:5px"><input type="checkbox" '+(q.other?'checked':'')+' onchange="updQ('+i+',\'sother\',this.checked)">包含「其他」选项（学生选了可填写说明，钉钉表格样式）</label>'+
+         '<label style="margin:0;font-weight:400;display:flex;align-items:center;gap:5px"><input type="checkbox" '+(q.multi?'checked':'')+' onchange="updQ('+i+',\'smulti\',this.checked)">允许多选</label></div>';
+    }else{
+      q.opts.forEach(function(o,j){
+        h+='<div class="optrow"><span class="ck"><input type="checkbox" '+(q.ans.indexOf(j)>=0?'checked':'')+' onchange="toggleAns('+i+','+j+',this.checked)">正确</span>'+
+           '<input type="text" value="'+esc(o)+'" oninput="updQ('+i+',\'opt'+j+'\',this.value)"></div>';
+      });
+    }
     h+='</div>';
   });
   document.getElementById("qList").innerHTML=h;
@@ -685,8 +769,12 @@ function loadCfgToForm(){
 function addQ(t){EDIT.questions.push(blankQ(t));updQList()}
 function delQ(i){if(!confirm("删除第"+(i+1)+"题？"))return;EDIT.questions.splice(i,1);updQList()}
 function updQ(i,f,v){
-  if(f==="q")EDIT.questions[i].q=v;
-  else if(f.indexOf("opt")===0)EDIT.questions[i].opts[+f.slice(3)]=v;
+  var q=EDIT.questions[i];
+  if(f==="q")q.q=v;
+  else if(f==="ansb")q.ans=v;
+  else if(f==="sother")q.other=v;
+  else if(f==="smulti")q.multi=v;
+  else if(f.indexOf("opt")===0)q.opts[+f.slice(3)]=v;
 }
 function toggleAns(i,j,on){
   var q=EDIT.questions[i];
@@ -706,8 +794,15 @@ function savePaper(){
   EDIT.shuffleO=document.getElementById("cfgShufO").checked;
   if(EDIT.draw>EDIT.questions.length){alert("抽题数（"+EDIT.draw+"）不能大于题库题数（"+EDIT.questions.length+"）");return}
   if(!EDIT.questions.length){alert("至少要有一道题");return}
-  if(EDIT.questions.some(function(q){return !q.q.trim()})){alert("有题目没写内容");return}
-  if(EDIT.questions.some(function(q){return !q.ans.length})){alert("有题目没勾选正确答案");return}
+  EDIT.questions.forEach(function(q){q.q=(q.q||"").trim()});
+  if(EDIT.questions.some(function(q){return !q.q})){alert("有题目没写内容");return}
+  EDIT.questions.forEach(function(q){
+    if(q.opts)q.opts=q.opts.map(function(s){return String(s||"").trim()}).filter(Boolean);
+  });
+  var badAns=EDIT.questions.some(function(q){return (q.type==="single"||q.type==="multi"||q.type==="judge")&&!q.ans.length});
+  if(badAns){alert("选择题里有没有勾选正确答案的题");return}
+  var badSv=EDIT.questions.some(function(q){return q.type==="survey"&&q.opts.length<2});
+  if(badSv){alert("调研题至少要保留 2 个非空选项");return}
   EDIT.updated=new Date().toLocaleString("zh-CN",{hour12:false});
   var i=PAPERS.findIndex(function(x){return x.id===EDIT.id});
   if(i>=0)PAPERS[i]=EDIT;else PAPERS.push(EDIT);
@@ -820,8 +915,8 @@ function renderAdmin(){
   h+='<table><tr><th>姓名</th><th>提交时间</th><th>得分</th><th>判定</th><th>每题作答</th></tr>';
   view.forEach(function(r){
     var det=r.detail.map(function(d,i){
-      var my=Array.isArray(d.my)?(d.my.length?d.my.map(function(v){return "ABCD"[v]}).join(""):"-"):(d.my<0?"-":"ABCD"[d.my]);
-      return (i+1)+":"+my+(d.ok?"√":"×");
+      var my=Array.isArray(d.my)?(d.my.length?d.my.map(function(v){return "ABCD"[v]}).join(""):"-"):(d.my<0?"-":String(d.my));
+      return (i+1)+":"+my+(d.survey?"":(d.ok?"√":"×"));
     }).join(" ");
     h+='<tr><td>'+esc(r.name)+'</td><td>'+esc(r.time||"")+'</td><td><b>'+r.score+'</b></td>'+
        '<td style="color:'+(r.score>=pl?'#18a058':'#d93535')+'">'+(r.score>=pl?'合格':'不合格')+'</td>'+
@@ -887,10 +982,10 @@ function renderStats(f,view){
   var pts=sorted.map(function(r,i){return [pad+i*(W-2*pad)/Math.max(1,sorted.length-1), H-pad-(r.score/100)*(H-2*pad)];});
   var poly=pts.map(function(p){return p[0].toFixed(1)+","+p[1].toFixed(1)}).join(" ");
   var lineCol=avg>=pl?"#159c52":"#2456c4";
-  /* ---- 每题正确率 ---- */
+  /* ---- 每题正确率（跳过调研题） ---- */
   var qs={};
   view.forEach(function(r){ r.detail.forEach(function(d){
-    if(!d.q)return; var k=d.q; qs[k]=qs[k]||{ok:0,n:0,ans:d.ans}; qs[k].n++; if(d.ok)qs[k].ok++;
+    if(!d.q||d.survey)return; var k=d.q; qs[k]=qs[k]||{ok:0,n:0,ans:d.ans}; qs[k].n++; if(d.ok)qs[k].ok++;
   })});
   var qarr=Object.keys(qs).map(function(k){return {q:k,ok:qs[k].ok,n:qs[k].n,rate:Math.round(qs[k].ok/qs[k].n*100),ans:qs[k].ans}});
   var qh='';
@@ -928,6 +1023,40 @@ function renderStats(f,view){
     +pts.map(function(p){return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.5" fill="'+lineCol+'"/>'}).join("")
     +'</svg></div>';
   h+=qh;
+  /* ---- 调研题结果统计（钉钉表格风格） ---- */
+  var surveys={};
+  view.forEach(function(r){ r.detail.forEach(function(d){
+    if(!d.survey||!d.q)return;
+    surveys[d.q]=surveys[d.q]||{opts:d.opts||[],other:!!d.other,answers:[]};
+    surveys[d.q].answers.push({who:r.name,picks:d.picks||(d.my?d.my.split("、"):[]),other:d.other||""});
+  })});
+  if(Object.keys(surveys).length){
+    h+='<div style="margin-top:26px;font-size:13px;font-weight:600">调研题结果（各选项选择人数 / 占比）</div>';
+    Object.keys(surveys).forEach(function(sq){
+      var s=surveys[sq],n=s.answers.length||1;
+      var cnt={};s.answers.forEach(function(a){a.picks.forEach(function(p){
+        var key=p.indexOf("其他：")===0?"其他":p; cnt[key]=(cnt[key]||0)+1;
+      })});
+      var optNames=s.opts.slice();if(s.other)optNames.push("其他");
+      h+='<div style="border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:12px;background:#fff">';
+      h+='<div style="font-size:13px;font-weight:600;line-height:1.6">'+esc(sq)+' <span style="font-size:11px;color:#99a;font-weight:400">'+s.answers.length+' 人参与</span></div>';
+      optNames.forEach(function(o){
+        var c=cnt[o]||0,pct=Math.round(c/n*100);
+        h+='<div style="margin-top:9px"><div style="font-size:12px;display:flex;justify-content:space-between;gap:8px"><span>'+esc(o)+(o==="其他"?' <span style="color:#889">（自填）</span>':'')+'</span><b style="color:#2456c4">'+c+' 人 · '+pct+'%</b></div>'
+          +'<div style="background:#eef1f6;border-radius:4px;height:10px;margin-top:4px;overflow:hidden"><div class="gbar" style="width:'+pct+'%;height:100%;background:'+(o==="其他"?"#c77d0a":"#2456c4")+'"></div></div></div>';
+      });
+      var others=s.answers.filter(function(a){return a.picks.some(function(p){return p.indexOf("其他：")===0})});
+      if(others.length){
+        h+='<div style="margin-top:10px;font-size:12px;color:#4a5264">「其他」填写内容：</div>';
+        others.forEach(function(a){
+          a.picks.forEach(function(p){
+            if(p.indexOf("其他：")===0&&p.length>3)h+='<div style="font-size:12px;color:#33415e;margin-top:4px">· '+esc(p.slice(3))+' <span style="color:#99a">—— '+esc(a.who)+'</span></div>';
+          });
+        });
+      }
+      h+='</div>';
+    });
+  }
   box.innerHTML=h;
 }
 function scoreFilterView(){
@@ -942,6 +1071,7 @@ function exportWrong(){
   if(!view.length){alert("暂无符合筛选条件的记录可导出");return}
   var qs={};
   view.forEach(function(r){ r.detail.forEach(function(d){
+    if(!d.q||d.survey)return;
     var k=(r.paperTitle||"未知试卷")+"||"+(d.q||"");
     qs[k]=qs[k]||{paper:r.paperTitle||"未知试卷",q:d.q,ok:0,n:0,who:[]};
     qs[k].n++; if(d.ok)qs[k].ok++; else qs[k].who.push(r.name);
