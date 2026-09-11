@@ -137,6 +137,7 @@ tr:nth-child(even) td{background:#fafbfe}
   <div class="tabs">
     <button class="btn small" id="tabB1" onclick="switchTab(0)">试卷管理</button>
     <button class="btn small gray" id="tabB2" onclick="switchTab(1)">成绩查询</button>
+    <button class="btn small gray" id="tabB3" onclick="adminLogout()">退出登录</button>
   </div>
 
   <!-- 试卷列表 -->
@@ -637,6 +638,15 @@ try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
   show("pgAdmin");switchTab(0);renderPaperAdmin();loadSubs(true);
+}
+function adminLogout(){
+  if(!confirm("确定退出登录吗？"))return;
+  sessionStorage.removeItem("quiz_admin");
+  sessionStorage.removeItem("quiz_admin_who");
+  sessionStorage.removeItem("quiz_admin_user");
+  sessionStorage.removeItem("quiz_admin_master");
+  CUR_USER=null;IS_MASTER=false;
+  show("pgLogin");
 }
 function switchTab(i){
   document.getElementById("tabPapers").classList.toggle("hide",i!==0);
