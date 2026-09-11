@@ -160,6 +160,15 @@ tr:nth-child(even) td{background:#fafbfe}
       <input type="datetime-local" id="cfgClose">
       <label>每人最多答题次数</label>
       <input type="number" id="cfgTries" min="1" max="99" value="1">
+      <label>切屏检测（允许切出次数，0 = 不检测）</label>
+      <input type="number" id="cfgSwitch" min="0" max="99" value="0">
+      <div style="font-size:12px;color:#999;margin-top:4px">答题期间切到别的软件 / 别的标签页 / 最小化都会记一次；超过上限直接锁定无法答题。0 = 本次考试不开启</div>
+      <label>考试限时（分钟，0 = 不限时）</label>
+      <input type="number" id="cfgLimit" min="0" max="600" value="0">
+      <div style="font-size:12px;color:#999;margin-top:4px">开考后倒计时（切屏刷新时间照走），时间一到自动交卷</div>
+      <label>多选题每题分值（0 = 全部题目平均分）</label>
+      <input type="number" id="cfgScoreMulti" min="0" max="50" value="0">
+      <div style="font-size:12px;color:#999;margin-top:4px">例如设 20：每道多选题固定 20 分，其余题目平分剩下的分数；填 0 则所有题平均分</div>
       <label>合格分数线（0-100）</label>
       <input type="number" id="cfgPass" min="0" max="100" value="60">
       <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShowAns" style="width:18px;height:18px;flex:none"> 提交后向学生显示得分和正确答案</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">不勾选 = 学生交卷只见「已提交」，成绩由老师统一公布</span></label>
@@ -346,6 +355,7 @@ function openPaper(id){
   document.getElementById("pMeta").textContent=qTypeSummary(p.questions)+"　题库 "+p.questions.length+" 题"+(draw>0?"　开考随机抽 "+draw+" 题":"")+"　满分 100";
   var info=["每人可答：<b>"+(p.tries||1)+"</b> 次　合格线："+(p.passLine!=null?p.passLine:60)+" 分"];
   if(draw>0)info.push("每人试卷从 "+p.questions.length+" 题题库中随机抽取 "+draw+" 题"+(p.shuffleQ?"，题目乱序":"")+(p.shuffleO?"，选项乱序":""));
+  if(p.switchLimit>0)info.push('<span class="warn">⚠ 切屏检测：切出答题页面累计超过 '+p.switchLimit+' 次将无法继续答题</span>');
   if(p.openT)info.push("开始："+fmtT(p.openT));
   if(p.closeT)info.push('截止：<b>'+fmtT(p.closeT)+'</b>');
   if(st==="early")info.push('<span class="warn">⚠ 考试尚未开始，到点才能进</span>');
@@ -401,6 +411,9 @@ function startExam(){
       return q.type==="multi"?[]:-1;
     });
     renderQuiz();show("pgQuiz");
+    swStart(parseInt(CUR.switchLimit,10)||0);   /* 开启切屏检测（老师设置了上限才启用） */
+    if(SW.active)alert("切屏检测已开启：答题期间切出答题页面累计不能超过 "+SW.limit+" 次，超过将无法继续答题。\n请专心作答。");
+    examTimerStart();   /* 限时考试开始倒计时（0=不限时） */
   });
 }
 
@@ -460,9 +473,12 @@ function pickBlank(i,v){answers[i]=v;
 function pickOther(i,v){otherTexts[i]=v}
 
 /* ---------- 提交（第二道锁：交卷前云端二次校验） ---------- */
-function submitQuiz(){
+function submitQuiz(auto){
+  if(TIMER.sent)return;   /* 自动交卷只触发一次 */
   var un=answers.filter(function(a,i){return !qAnswered(EXAM_QS[i],a)}).length;
-  if(un>0&&!confirm("还有 "+un+" 题没答，确定提交吗？"))return;
+  if(un>0&&!auto&&!confirm("还有 "+un+" 题没答，确定提交吗？"))return;
+  if(auto&&un>0)swStop();   /* 时间到自动交卷，未答的题按空处理 */
+  TIMER.sent=true;
   var tries=Math.max(1,parseInt(CUR.tries,10)||1);
   var b=document.getElementById("subBtn");b.disabled=true;b.textContent="校验答题次数…";
   cloudAttempts(studentName,CUR.id,function(c){
@@ -479,8 +495,19 @@ function submitQuiz(){
   });
 }
 function doSubmit(){
+  swStop();examTimerStop();   /* 交卷即停止切屏检测与倒计时 */
   var scoredQ=EXAM_QS.filter(function(q){return q.type!=="survey"});
-  var per=scoredQ.length?100/scoredQ.length:100,score=0,detail=[];
+  /* 计分：多选题可固定分值（老师设置 scoreMulti），其余题型平分剩余分；没设置则全部均分 */
+  var mScore=parseInt(CUR.scoreMulti,10)||0;
+  var multiN=scoredQ.filter(function(q){return q.type==="multi"}).length;
+  var otherPer=0;
+  if(mScore>0&&multiN>0&&mScore*multiN<100){
+    var rest=100-mScore*multiN,otherN=scoredQ.length-multiN;
+    otherPer=otherN>0?rest/otherN:0;
+  }else mScore=0;
+  var perDef=scoredQ.length?100/scoredQ.length:100;
+  function perOf(q){return mScore>0?(q.type==="multi"?mScore:otherPer):perDef}
+  var score=0,detail=[];
   EXAM_QS.forEach(function(q,i){
     var my=Array.isArray(answers[i])?answers[i].slice():answers[i];
     if(q.type==="survey"){
@@ -491,6 +518,7 @@ function doSubmit(){
       detail.push({survey:true,ok:null,my:labels.join("、"),picks:labels,q:q.q,opts:q.opts,other:otherTexts[i]||""});
       return;
     }
+    var per=perOf(q);
     if(q.type==="blank"){
       var t=String(my||"").trim(),ref=(q.ans||"").trim();
       var ok=ref?t.toLowerCase()===ref.toLowerCase():t.length>0;
@@ -503,7 +531,8 @@ function doSubmit(){
     detail.push({ok:ok,my:my,q:q.q,opts:q.opts,ans:q.ans});
   });
   score=Math.round(score*10)/10;
-  var rec={name:studentName,paperId:CUR.id,paperTitle:CUR.title,time:new Date().toLocaleString("zh-CN",{hour12:false}),ts:Date.now(),score:score,detail:detail};
+  var rec={name:studentName,paperId:CUR.id,paperTitle:CUR.title,time:new Date().toLocaleString("zh-CN",{hour12:false}),ts:Date.now(),score:score,detail:detail,
+           switchOut:(CUR.switchLimit>0?SW.count:undefined)};
   var b=document.getElementById("subBtn");b.disabled=true;b.textContent="提交中…";
   uploadSub(rec).then(function(ok){
     b.disabled=false;b.textContent="提交答卷";
@@ -603,7 +632,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260910i";
+var QUIZ_VER="V20260911a";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -632,6 +661,9 @@ function renderPaperAdmin(){
     h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
        '<div class="pm">'+qTypeSummary(p.questions)+'　题库 '+p.questions.length+' 题'+(p.draw>0?'　<em style="color:#34618e;font-style:normal">随机抽 '+p.draw+' 题</em>':'')+
        (p.shuffleQ?'　<em style="color:#34618e;font-style:normal">乱序题</em>':'')+(p.shuffleO?'　<em style="color:#34618e;font-style:normal">乱序选项</em>':'')+
+       (p.switchLimit>0?'　<em style="color:#d93a3a;font-style:normal">切屏限制 '+p.switchLimit+' 次</em>':'')+
+       (p.limitMin>0?'　<em style="color:#34618e;font-style:normal">限时 '+p.limitMin+' 分钟</em>':'')+
+       (p.scoreMulti>0?'　<em style="color:#34618e;font-style:normal">多选 '+p.scoreMulti+' 分/题</em>':'')+
        '　每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分'+
        (p.closeT?'　截止 '+fmtT(p.closeT):'')+(p.showAns===false?'　<em>不公布答案</em>':'')+'</div>'+
        '<div class="row"><button class="btn small" onclick="editPaper(\''+p.id+'\')">编辑</button>'+
@@ -759,6 +791,9 @@ function loadCfgToForm(){
   document.getElementById("cfgOpen").value=EDIT.openT||"";
   document.getElementById("cfgClose").value=EDIT.closeT||"";
   document.getElementById("cfgTries").value=EDIT.tries||1;
+  document.getElementById("cfgSwitch").value=EDIT.switchLimit||0;
+  document.getElementById("cfgLimit").value=EDIT.limitMin||0;
+  document.getElementById("cfgScoreMulti").value=EDIT.scoreMulti||0;
   document.getElementById("cfgPass").value=EDIT.passLine!=null?EDIT.passLine:60;
   document.getElementById("cfgShowAns").checked=EDIT.showAns!==false;
   document.getElementById("cfgDraw").value=EDIT.draw||0;
@@ -787,6 +822,9 @@ function savePaper(){
   EDIT.openT=document.getElementById("cfgOpen").value||"";
   EDIT.closeT=document.getElementById("cfgClose").value||"";
   EDIT.tries=Math.max(1,parseInt(document.getElementById("cfgTries").value,10)||1);
+  EDIT.switchLimit=Math.max(0,parseInt(document.getElementById("cfgSwitch").value,10)||0);
+  EDIT.limitMin=Math.max(0,parseInt(document.getElementById("cfgLimit").value,10)||0);
+  EDIT.scoreMulti=Math.max(0,parseInt(document.getElementById("cfgScoreMulti").value,10)||0);
   EDIT.passLine=parseInt(document.getElementById("cfgPass").value,10);
   EDIT.showAns=document.getElementById("cfgShowAns").checked;
   EDIT.draw=Math.max(0,parseInt(document.getElementById("cfgDraw").value,10)||0);
@@ -912,7 +950,7 @@ function renderAdmin(){
   renderStats(f,view);
   if(!view.length){document.getElementById("adminList").innerHTML='<div class="muted" style="padding:20px">暂无答卷记录</div>';return}
   var h='<div class="link" style="margin:0 0 10px;text-align:left" onclick="SCORE_VIEW=null;renderAdmin()">← 返回试卷总览</div>';
-  h+='<table><tr><th>姓名</th><th>提交时间</th><th>得分</th><th>判定</th><th>每题作答</th></tr>';
+  h+='<table><tr><th>姓名</th><th>提交时间</th><th>得分</th><th>判定</th><th>切屏</th><th>每题作答</th></tr>';
   view.forEach(function(r){
     var det=r.detail.map(function(d,i){
       var my=Array.isArray(d.my)?(d.my.length?d.my.map(function(v){return "ABCD"[v]}).join(""):"-"):(d.my<0?"-":String(d.my));
@@ -920,6 +958,7 @@ function renderAdmin(){
     }).join(" ");
     h+='<tr><td>'+esc(r.name)+'</td><td>'+esc(r.time||"")+'</td><td><b>'+r.score+'</b></td>'+
        '<td style="color:'+(r.score>=pl?'#18a058':'#d93535')+'">'+(r.score>=pl?'合格':'不合格')+'</td>'+
+       '<td style="color:'+(r.switchOut>0?'#d93535':'#7b8496')+'">'+(r.switchOut!=null?r.switchOut+' 次':'-')+'</td>'+
        '<td style="text-align:left;font-size:11px">'+esc(det)+'</td></tr>';
   });
   h+='</table>';
@@ -1120,6 +1159,78 @@ function forceExit(msg){
     '<div style="font-size:16px;font-weight:600;margin:14px 0 8px">无法继续</div>'+
     '<div style="font-size:13px;color:#7b8496;line-height:1.9">'+msg+'</div></div>';
   document.body.appendChild(d);
+}
+
+/* ================= 切屏检测 =================
+   答题期间：切到别的软件 / 最小化 / 切标签页 → 记一次并提醒；
+   超过试卷设置的上限 → 锁定，显示"无法答题"。
+   老师后台不设置（0）则完全不启用。 */
+var SW={count:0,limit:0,last:0,active:false,pending:0};
+function swStart(limit){
+  SW.count=0;SW.limit=Math.max(0,limit|0);SW.last=0;SW.pending=0;
+  SW.active=SW.limit>0;
+}
+function swHit(){
+  if(!SW.active||!document.getElementById("pgQuiz")||document.getElementById("pgQuiz").classList.contains("hide"))return;
+  var now=Date.now();
+  if(now-SW.last<1500)return;   /* blur + visibilitychange 会连着触发，1.5 秒内只记一次 */
+  SW.last=now;SW.count++;SW.pending++;
+}
+function swReport(){
+  if(!SW.active||!SW.pending)return;
+  var p=SW.pending;SW.pending=0;
+  var left=SW.limit-SW.count;
+  if(left<=0){swLock();return}
+  SW.active=false;   /* 弹窗本身会让窗口失焦，先暂停检测防误计 */
+  alert("⚠ 检测到切出答题页面 "+p+" 次！\n\n已累计 "+SW.count+" / "+SW.limit+" 次，还剩 "+left+" 次机会。\n请专心作答，超过上限将无法继续答题。");
+  SW.active=true;
+}
+function swLock(){
+  swStop();
+  forceExit("检测到多次切出答题页面（累计 "+SW.count+" 次，上限 "+SW.limit+" 次）。<br>本次考试已被锁定，无法继续答题和提交。<br>如遇特殊情况，请联系老师说明。");
+}
+function swStop(){SW.active=false;SW.pending=0}
+window.addEventListener("blur",swHit);
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden)swHit();else swReport();   /* 回到页面时弹出提醒 */
+});
+window.addEventListener("focus",swReport);
+
+/* ================= 考试限时 =================
+   开考起倒计时（截止时间存本机，刷新/切屏时间照走，防重进续命），
+   时间一到自动交卷。老师设 0 则不限时。 */
+var TIMER={end:0,int:0,sent:false};
+function examTimerStart(){
+  var min=parseInt(CUR.limitMin,10)||0;
+  if(!min)return;
+  var k="quiz_dl_"+CUR.id+"_"+studentName;
+  var end=parseInt(localStorage.getItem(k),10)||0;
+  /* 没存过 / 已严重过期（超过1天）→ 全新开考；否则沿用旧截止，刷新重进不加时 */
+  if(!end||end<Date.now()-86400000){end=Date.now()+min*60000}
+  localStorage.setItem(k,end);
+  TIMER.end=end;TIMER.sent=false;
+  var bar=document.createElement("div");
+  bar.id="examTimer";
+  bar.style.cssText="position:sticky;top:0;z-index:9;background:#fff;border:1px solid #e4e8f0;border-radius:8px;padding:9px 12px;font-weight:600;color:#2456c4;text-align:center;margin-bottom:12px;font-variant-numeric:tabular-nums";
+  document.getElementById("pgQuiz").insertBefore(bar,document.getElementById("quizCard"));
+  TIMER.int=setInterval(tickTimer,500);tickTimer();
+}
+function tickTimer(){
+  var el=document.getElementById("examTimer");
+  if(!el){clearInterval(TIMER.int);return}
+  var left=Math.max(0,TIMER.end-Date.now());
+  var m=Math.floor(left/60000),s=Math.floor(left%60000/1000);
+  el.textContent="剩余时间："+m+" 分 "+(s<10?"0":"")+s+" 秒";
+  if(left<=60000)el.style.color="#d93a3a";
+  if(left<=0&&!TIMER.sent){
+    clearInterval(TIMER.int);
+    el.textContent="时间到，正在自动交卷…";
+    submitQuiz(true);
+  }
+}
+function examTimerStop(){
+  clearInterval(TIMER.int);
+  if(CUR&&studentName)localStorage.removeItem("quiz_dl_"+CUR.id+"_"+studentName);
 }
 /* ================= 启动 ================= */
 document.getElementById("pwdInput").addEventListener("keydown",function(e){if(e.key==="Enter")adminLogin()});
