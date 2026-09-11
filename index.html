@@ -18,6 +18,20 @@ input[type=text],input[type=datetime-local],input[type=number],select,textarea{w
 textarea{min-height:68px;resize:vertical;font-size:14px;line-height:1.6}
 input:focus,select:focus,textarea:focus{border-color:var(--main);box-shadow:0 0 0 3px rgba(36,86,196,.1)}
 input[type=checkbox]{accent-color:var(--main)}
+/* 开关（toggle switch）—— 试卷设置里的勾选项 */
+.sw{position:relative;display:inline-block;width:40px;height:22px;flex:none}
+.sw input{opacity:0;width:0;height:0;position:absolute;margin:0}
+.sw .sl{position:absolute;inset:0;background:#c9cfda;border-radius:22px;transition:.2s;cursor:pointer}
+.sw .sl:before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.sw input:checked+.sl{background:var(--main)}
+.sw input:checked+.sl:before{transform:translateX(18px)}
+/* 紧凑信息 chips —— 卡片 meta 用 */
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.chip{font-size:11px;line-height:1;padding:4px 8px;border-radius:9px;background:var(--main-l);color:#34618e;white-space:nowrap}
+.chip.r{background:#fdeeee;color:#d93a3a}
+.chip.g{background:#e8f7ef;color:#159c52}
+.chip.w{background:#fdf3e3;color:#c77d0a}
+.chip.gray{background:#eef1f6;color:#7b8496}
 .btn{display:block;width:100%;padding:13px;border:none;border-radius:8px;font-size:15px;font-weight:600;background:var(--main);color:#fff;margin-top:16px;cursor:pointer;letter-spacing:2px;transition:background .15s}
 .btn:active{background:var(--main-d)}
 .btn.gray{background:#fff;color:#4a5264;border:1px solid var(--line)}
@@ -173,11 +187,11 @@ tr:nth-child(even) td{background:#fafbfe}
       <div style="font-size:12px;color:#999;margin-top:4px">例如设 20：每道多选题固定 20 分，其余题目平分剩下的分数；填 0 则所有题平均分</div>
       <label>合格分数线（0-100）</label>
       <input type="number" id="cfgPass" min="0" max="100" value="60">
-      <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShowAns" style="width:18px;height:18px;flex:none"> 提交后向学生显示得分和正确答案</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">不勾选 = 学生交卷只见「已提交」，成绩由老师统一公布</span></label>
+      <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><span class="sw"><input type="checkbox" id="cfgShowAns"><span class="sl"></span></span> 提交后向学生显示得分和正确答案</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">关闭 = 学生交卷只见「已提交」，成绩由老师统一公布</span></label>
       <label style="margin-top:14px">抽题数（题库共 N 题，每个学生随机抽 M 题；不填或填 0 = 全部题目）</label>
       <input type="number" id="cfgDraw" min="0" max="999" value="0" placeholder="0=全部">
-      <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShufQ" style="width:18px;height:18px;flex:none"> 打乱题目顺序</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">每个学生开考时题目随机排序</span></label>
-      <label style="margin-top:10px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><input type="checkbox" id="cfgShufO" style="width:18px;height:18px;flex:none"> 打乱选项顺序</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">每个学生开考时每题选项随机排序（答案自动跟着选项走）</span></label>
+      <label style="margin-top:14px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><span class="sw"><input type="checkbox" id="cfgShufQ"><span class="sl"></span></span> 打乱题目顺序</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">每个学生开考时题目随机排序</span></label>
+      <label style="margin-top:10px"><span style="display:flex;align-items:center;gap:8px;font-weight:400"><span class="sw"><input type="checkbox" id="cfgShufO"><span class="sl"></span></span> 打乱选项顺序</span><span style="display:block;font-size:12px;color:#999;margin-top:4px">每个学生开考时每题选项随机排序（答案自动跟着选项走）</span></label>
     </div>
     <div class="card">
       <div style="font-weight:600;margin-bottom:10px">题目编辑（<span id="qCount">0</span> 题，每题分值 = 100÷题数）</div>
@@ -308,22 +322,10 @@ function bumpDevice(pid,name){localStorage.setItem(attKey(pid,name),deviceAttemp
 
 /* 云端实时拉取该姓名在该卷的已交次数；拉取失败时返回 null（由调用方决定降级策略） */
 function cloudAttempts(name,pid,cb){
-  fetch(GH+"/contents/data?ref=main&t="+Date.now(),{headers:ghH()}).then(function(r){
-    if(!r.ok)throw new Error("HTTP "+r.status);return r.json();
-  }).then(function(list){
-    if(!Array.isArray(list))return cb(0);
-    var mine=list.filter(function(f){return /\.json$/.test(f.name)});
-    if(!mine.length)return cb(0);
-    var cnt=0,jobs=mine.map(function(f){
-      return fetch(f.url,{headers:ghH()}).then(function(r){return r.json()}).then(function(d){
-        try{
-          var rec=JSON.parse(decodeURIComponent(escape(atob(d.content))));
-          if(rec&&rec.paperId===pid&&normName(rec.name)===name)cnt++;
-        }catch(e){}
-      }).catch(function(){});
-    });
-    return Promise.all(jobs).then(function(){cb(cnt)});
-  }).catch(function(){cb(null)});
+  fetchSubs().then(function(recs){
+    if(recs==null)return cb(null);   /* 云端拉不到 */
+    cb(recs.filter(function(r){return r&&r.paperId===pid&&normName(r.name)===name}).length);
+  });
 }
 
 /* 综合校验：取 云端次数 与 本机次数 的最大值；云端拉不到时用本机次数兜底（绝不低于已知值） */
@@ -340,10 +342,17 @@ function renderHome(){
   if(!PAPERS.length)h='<div class="card"><div class="muted" style="padding:16px">暂无考试，请等老师发布</div></div>';
   PAPERS.forEach(function(p){
     var st=pState(p);
+    var chips='<div class="chips">'+
+      '<span class="chip">'+qTypeSummary(p.questions)+' · '+p.questions.length+' 题</span>'+
+      '<span class="chip gray">满分 100</span>'+
+      (p.limitMin>0?'<span class="chip">限时 '+p.limitMin+' 分钟</span>':'')+
+      (p.closeT?'<span class="chip '+(st==="over"?"gray":"w")+'">'+(st==="over"?"已截止":"截止")+' '+fmtT(p.closeT)+'</span>':'')+
+      '<span class="chip gray">每人 '+(p.tries||1)+' 次</span>'+
+      '<span class="chip g">合格 '+(p.passLine!=null?p.passLine:60)+' 分</span>'+
+      (p.switchLimit>0?'<span class="chip r">切屏限制 '+p.switchLimit+' 次</span>':'')+
+      '</div>';
     h+='<div class="paper" onclick="openPaper(\''+p.id+'\')">'+
-       '<div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
-       '<div class="pm">'+qTypeSummary(p.questions)+'　共 '+p.questions.length+' 题　满分 100<br>'+
-       (p.closeT?'截止：<b>'+fmtT(p.closeT)+'</b>　':'')+'每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分</div></div>';
+       '<div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+chips+'</div>';
   });
   document.getElementById("paperList").innerHTML=h;
 }
@@ -634,7 +643,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260911d";
+var QUIZ_VER="V20260912a";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -669,13 +678,18 @@ function renderPaperAdmin(){
   if(!mine.length)h='<div class="card"><div class="muted" style="padding:16px">'+(IS_MASTER?"还没有试卷，点上面「新建试卷」":"你还没有试卷，点上面「新建试卷」创建一套")+'</div></div>';
   mine.forEach(function(p){
     var st=pState(p);
-    h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
-       '<div class="pm">'+qTypeSummary(p.questions)+'　题库 '+p.questions.length+' 题'+(p.draw>0?'　<em style="color:#34618e;font-style:normal">随机抽 '+p.draw+' 题</em>':'')+
-       (p.shuffleQ?'　<em style="color:#34618e;font-style:normal">乱序题</em>':'')+(p.shuffleO?'　<em style="color:#34618e;font-style:normal">乱序选项</em>':'')+
-       (p.switchLimit>0?'　<em style="color:#d93a3a;font-style:normal">切屏限制 '+p.switchLimit+' 次</em>':'')+
-       (p.limitMin>0?'　<em style="color:#34618e;font-style:normal">限时 '+p.limitMin+' 分钟</em>':'')+
-       (p.scoreMulti>0?'　<em style="color:#34618e;font-style:normal">多选 '+p.scoreMulti+' 分/题</em>':'')+
-       '　每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分'+
+    var chips='<div class="chips">'+
+      '<span class="chip">'+qTypeSummary(p.questions)+' · 题库 '+p.questions.length+' 题</span>'+
+      (p.draw>0?'<span class="chip">开考随机抽 '+p.draw+' 题</span>':'')+
+      (p.shuffleQ?'<span class="chip">乱序题</span>':'')+
+      (p.shuffleO?'<span class="chip">乱序选项</span>':'')+
+      (p.switchLimit>0?'<span class="chip r">切屏限制 '+p.switchLimit+' 次</span>':'')+
+      (p.limitMin>0?'<span class="chip">限时 '+p.limitMin+' 分钟</span>':'')+
+      (p.scoreMulti>0?'<span class="chip">多选 '+p.scoreMulti+' 分/题</span>':'')+
+      '<span class="chip gray">每人 '+(p.tries||1)+' 次</span>'+
+      '<span class="chip g">合格 '+(p.passLine!=null?p.passLine:60)+' 分</span>'+
+      '</div>';
+    h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+chips+
        (p.closeT?'　截止 '+fmtT(p.closeT):'')+(p.showAns===false?'　<em>不公布答案</em>':'')+'</div>'+
        '<div class="row"><button class="btn small" onclick="editPaper(\''+p.id+'\')">编辑</button>'+
        '<button class="btn small green" onclick="copyExamLink(\''+p.id+'\')">复制考试链接</button>'+
@@ -723,28 +737,13 @@ function delPaper(id){
 }
 function delPaperRecords(p,cb,pass){
   pass=pass||1;
-  fetch(GH+"/contents/data?ref=main",{headers:ghH()}).then(function(r){return r.json()}).then(function(list){
-    if(!Array.isArray(list))return cb(0);
-    var jobs=[],n=0,left=0;
-    list.forEach(function(f){
-      if(!/\.json$/.test(f.name))return;
-      var job=fetch(f.url,{headers:ghH()}).then(function(r){return r.json()}).then(function(d){
-        try{
-          var rec=JSON.parse(decodeURIComponent(escape(atob(d.content))));
-          if(rec.paperId===p.id||rec.paperTitle===p.title){
-            n++;
-            return fetch(GH+"/contents/"+f.path,{method:"DELETE",headers:ghH(),body:JSON.stringify({message:"del record",branch:"main",sha:d.sha})})
-              .then(function(r){ if(!r.ok)left++; }).catch(function(){left++});
-          }
-        }catch(e){}
-      }).catch(function(){});
-      jobs.push(job);
-    });
-    return Promise.all(jobs).then(function(){
-      if(left>0&&pass<3){delPaperRecords(p,function(m){cb(n+m)},pass+1)}
-      else cb(n);
-    });
-  }).catch(function(){cb(0)});
+  fetchSubs().then(function(recs){
+    if(recs==null)return cb(0);
+    var keep=recs.filter(function(r){return r.paperId!==p.id&&r.paperTitle!==p.title});
+    var n=recs.length-keep.length;
+    if(!n)return cb(0);
+    pushSubs(keep).then(function(ok){cb(ok?n:0)});
+  });
 }
 /* 总览页：清除已删试卷的残留成绩记录（按卷名匹配） */
 function purgeOrphan(t){
@@ -785,8 +784,8 @@ function updQList(){
            '<input type="text" value="'+esc(o)+'" oninput="updQ('+i+',\'opt'+j+'\',this.value)" placeholder="选项内容"></div>';
       });
       h+='<div style="font-size:12px;display:flex;gap:16px;margin-top:4px;flex-wrap:wrap">'+
-         '<label style="margin:0;font-weight:400;display:flex;align-items:center;gap:5px"><input type="checkbox" '+(q.other?'checked':'')+' onchange="updQ('+i+',\'sother\',this.checked)">包含「其他」选项（学生选了可填写说明，钉钉表格样式）</label>'+
-         '<label style="margin:0;font-weight:400;display:flex;align-items:center;gap:5px"><input type="checkbox" '+(q.multi?'checked':'')+' onchange="updQ('+i+',\'smulti\',this.checked)">允许多选</label></div>';
+         '<label style="margin:0;font-weight:400;display:flex;align-items:center;gap:7px"><span class="sw"><input type="checkbox" '+(q.other?'checked':'')+' onchange="updQ('+i+',\'sother\',this.checked)"><span class="sl"></span></span>包含「其他」选项</label>'+
+         '<label style="margin:0;font-weight:400;display:flex;align-items:center;gap:7px"><span class="sw"><input type="checkbox" '+(q.multi?'checked':'')+' onchange="updQ('+i+',\'smulti\',this.checked)"><span class="sl"></span></span>允许多选</label></div>';
     }else{
       q.opts.forEach(function(o,j){
         h+='<div class="optrow"><span class="ck"><input type="checkbox" '+(q.ans.indexOf(j)>=0?'checked':'')+' onchange="toggleAns('+i+','+j+',this.checked)">正确</span>'+
@@ -864,34 +863,65 @@ function savePaper(){
 
 /* ================= 成绩 ================= */
 function syncTip(t){document.getElementById("syncTip").textContent=t}
+/* ================= 成绩同步（单文件方案） =================
+   所有答卷存在 data/subs.json 一个数组里：
+   - 读 = 1 个请求（旧方案是"列目录 + 每份答卷各拉一次"N+1 个请求，慢且容易卡死）
+   - 写 = 读取现有数组 → 按 时间+姓名 去重合并 → PUT 回去
+   - 8 秒超时兜底，提示状态永远不会卡死 */
+var SUBS_PATH=GH+"/contents/data/subs.json";
+function parseGHJson(d){
+  try{return JSON.parse(decodeURIComponent(escape(atob(d.content))))}catch(e){return null}
+}
+function fetchSubs(){
+  /* 成功 resolve(recs数组)；失败 resolve(null)。404 = 还没有任何成绩，视为空数组 */
+  return new Promise(function(resolve){
+    var done=false;
+    var ctl=(typeof AbortController!=="undefined")?new AbortController():null;
+    var to=setTimeout(function(){if(!done){done=true;if(ctl)ctl.abort();resolve(null)}},8000);
+    fetch(SUBS_PATH+"?t="+Date.now(),{headers:ghH(),signal:ctl?ctl.signal:undefined})
+      .then(function(r){
+        if(r.status===404){if(!done){done=true;clearTimeout(to);resolve([])}return null}
+        if(!r.ok)throw new Error("HTTP "+r.status);
+        return r.json();
+      })
+      .then(function(d){
+        if(d===null)return;
+        if(done)return;done=true;clearTimeout(to);
+        var j=parseGHJson(d);resolve(Array.isArray(j)?j:[]);
+      })
+      .catch(function(){if(done)return;done=true;clearTimeout(to);resolve(null)});
+  });
+}
+function pushSubs(recs){
+  /* 把若干条记录合并进云端 subs.json：读现值 → 去重合并 → PUT */
+  return fetchSubs().then(function(cur){
+    if(cur==null)cur=[];
+    var map={};
+    cur.concat(recs).forEach(function(r){map[r.ts+"_"+normName(r.name)]=r});
+    var merged=Object.keys(map).map(function(k){return map[k]});
+    return fetch(SUBS_PATH+"?t="+Date.now(),{headers:ghH()})
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(info){
+        var body={message:"subs update",branch:"main",
+          content:btoa(unescape(encodeURIComponent(JSON.stringify(merged))))};
+        if(info&&info.sha)body.sha=info.sha;
+        return fetch(SUBS_PATH,{method:"PUT",headers:ghH(),body:JSON.stringify(body)})
+          .then(function(r){return r.ok});
+      });
+  }).catch(function(){return false});
+}
+function uploadSub(rec){return pushSubs([rec])}
 function allRecs(cb){
-  var done=false;
-  var ctl=(typeof AbortController!=="undefined")?new AbortController():null;
-  /* 8 秒拉不下来就放弃走缓存，别让"同步中"卡死 */
-  var to=setTimeout(function(){if(!done){done=true;if(ctl)ctl.abort();cb(null)}},8000);
-  fetch(GH+"/contents/data?ref=main",Object.assign({headers:ghH()},ctl?{signal:ctl.signal}:{})).then(function(r){
-    if(!r.ok)throw new Error("HTTP "+r.status);return r.json();
-  }).then(function(list){
-    if(!Array.isArray(list))list=[];
-    var jobs=list.filter(function(f){return /\.json$/.test(f.name)}).map(function(f){
-      return fetch(f.url,Object.assign({headers:ghH()},ctl?{signal:ctl.signal}:{})).then(function(r){return r.json()}).then(function(d){
-        try{return JSON.parse(decodeURIComponent(escape(atob(d.content))))}catch(e){return null}
-      }).catch(function(){return null});
-    });
-    return Promise.all(jobs);
-  }).then(function(recs){
-    if(done)return;done=true;clearTimeout(to);
-    var cloud=recs.filter(function(r){return r&&r.name});
-    CLOUD=cloud;
+  fetchSubs().then(function(recs){
+    if(recs)CLOUD=recs;
     var pend=localCache();
     if(pend.length){
-      Promise.all(pend.map(uploadSub)).then(function(oks){
-        saveLocalCache(pend.filter(function(_,i){return !oks[i]}));
-        if(oks.some(Boolean))setTimeout(function(){loadSubs(false)},1500);
+      pushSubs(pend).then(function(ok){
+        if(ok)saveLocalCache([]);
+        cb(CLOUD);
       });
-    }
-    cb(cloud);
-  }).catch(function(){if(done)return;done=true;clearTimeout(to);cb(null)});
+    }else cb(CLOUD);
+  });
 }
 function mergedRecs(){
   var map={};
@@ -985,14 +1015,21 @@ function clearAll(){
   if(!IS_MASTER){alert("只有超管可以清空全部记录");return}
   if(!confirm("确定清空全部云端答卷记录？此操作不可恢复！"))return;
   syncTip("清空中…");
-  fetch(GH+"/contents/data?ref=main",{headers:ghH()}).then(function(r){return r.json()}).then(function(list){
-    if(!Array.isArray(list))return[];
-    return Promise.all(list.map(function(f){
-      return fetch(GH+"/contents/"+f.path,{method:"DELETE",headers:ghH(),
-        body:JSON.stringify({message:"del",branch:"main",sha:f.sha})}).catch(function(){});
-    }));
-  }).then(function(){saveLocalCache([]);CLOUD=[];renderAdmin();syncTip("已清空 ✓")})
-   .catch(function(){syncTip("清空失败，请重试")});
+  fetchSubs().then(function(recs){
+    if(recs==null)return syncTip("清空失败，云端连接不上");
+    if(!recs.length){saveLocalCache([]);CLOUD=[];renderAdmin();syncTip("已清空 ✓");return}
+    var to=setTimeout(function(){syncTip("清空超时，请重试")},10000);
+    fetch(SUBS_PATH+"?t="+Date.now(),{headers:ghH()}).then(function(r){return r.ok?r.json():null}).then(function(info){
+      if(!info||!info.sha)throw new Error("no sha");
+      return fetch(SUBS_PATH,{method:"PUT",headers:ghH(),
+        body:JSON.stringify({message:"clear subs",branch:"main",sha:info.sha,
+          content:btoa(unescape(encodeURIComponent("[]")))})});
+    }).then(function(r){
+      clearTimeout(to);
+      if(r.ok){saveLocalCache([]);CLOUD=[];renderAdmin();syncTip("已清空 ✓")}
+      else syncTip("清空失败，请重试");
+    }).catch(function(){clearTimeout(to);syncTip("清空失败，请重试")});
+  });
 }
 function renderStats(f,view){
   var box=document.getElementById("statBox");
