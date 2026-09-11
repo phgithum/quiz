@@ -411,9 +411,9 @@ function startExam(){
       if(q.type==="survey")return q.multi?[]:-1;
       return q.type==="multi"?[]:-1;
     });
+    if(CUR.switchLimit>0)alert("切屏检测已开启：答题期间切出答题页面累计不能超过 "+CUR.switchLimit+" 次，超过将无法继续答题。\n请专心作答。");
     renderQuiz();show("pgQuiz");
-    swStart(parseInt(CUR.switchLimit,10)||0);   /* 开启切屏检测（老师设置了上限才启用） */
-    if(SW.active)alert("切屏检测已开启：答题期间切出答题页面累计不能超过 "+SW.limit+" 次，超过将无法继续答题。\n请专心作答。");
+    swStart(parseInt(CUR.switchLimit,10)||0);   /* 先弹提示再开启检测，避免提示弹窗自己的失焦被误计 */
     examTimerStart();   /* 限时考试开始倒计时（0=不限时） */
   });
 }
@@ -633,7 +633,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260911a";
+var QUIZ_VER="V20260911b";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -1177,7 +1177,8 @@ function forceExit(msg){
    老师后台不设置（0）则完全不启用。 */
 var SW={count:0,limit:0,last:0,active:false,pending:0};
 function swStart(limit){
-  SW.count=0;SW.limit=Math.max(0,limit|0);SW.last=0;SW.pending=0;
+  SW.count=0;SW.limit=Math.max(0,limit|0);SW.pending=0;
+  SW.last=Date.now();   /* 开考给 1.5 秒缓冲，开考提示等弹窗的失焦不计入 */
   SW.active=SW.limit>0;
 }
 function swHit(){
