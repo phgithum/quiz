@@ -252,7 +252,7 @@ var RAW="https://raw.githubusercontent.com/phgithum/cloud-db/main";
 function ghH(){return{"Authorization":"Bearer "+TOK1+TOK2,"Accept":"application/vnd.github+json","Content-Type":"application/json","User-Agent":"quiz-h5"}}
 
 /* ================= 全局状态 ================= */
-var PAPERS=[],EDIT=null,answers=[],studentName="",CUR=null,EXAM_QS=[],DIRECT=false,otherTexts=[];
+var PAPERS=[],CLOUD=[],EDIT=null,answers=[],studentName="",CUR=null,EXAM_QS=[],DIRECT=false,otherTexts=[];
 var CUR_USER="",IS_MASTER=false;
 function localCache(){try{return JSON.parse(localStorage.getItem("quiz_subs")||"[]")}catch(e){return[]}}
 function saveLocalCache(a){try{localStorage.setItem("quiz_subs",JSON.stringify(a))}catch(e){}}
@@ -636,7 +636,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260912c";
+var QUIZ_VER="V20260912d";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
