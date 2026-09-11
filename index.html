@@ -342,17 +342,10 @@ function renderHome(){
   if(!PAPERS.length)h='<div class="card"><div class="muted" style="padding:16px">暂无考试，请等老师发布</div></div>';
   PAPERS.forEach(function(p){
     var st=pState(p);
-    var chips='<div class="chips">'+
-      '<span class="chip">'+qTypeSummary(p.questions)+' · '+p.questions.length+' 题</span>'+
-      '<span class="chip gray">满分 100</span>'+
-      (p.limitMin>0?'<span class="chip">限时 '+p.limitMin+' 分钟</span>':'')+
-      (p.closeT?'<span class="chip '+(st==="over"?"gray":"w")+'">'+(st==="over"?"已截止":"截止")+' '+fmtT(p.closeT)+'</span>':'')+
-      '<span class="chip gray">每人 '+(p.tries||1)+' 次</span>'+
-      '<span class="chip g">合格 '+(p.passLine!=null?p.passLine:60)+' 分</span>'+
-      (p.switchLimit>0?'<span class="chip r">切屏限制 '+p.switchLimit+' 次</span>':'')+
-      '</div>';
     h+='<div class="paper" onclick="openPaper(\''+p.id+'\')">'+
-       '<div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+chips+'</div>';
+       '<div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
+       '<div class="pm">'+qTypeSummary(p.questions)+'　共 '+p.questions.length+' 题　满分 100<br>'+
+       (p.closeT?'截止：<b>'+fmtT(p.closeT)+'</b>　':'')+'每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分</div></div>';
   });
   document.getElementById("paperList").innerHTML=h;
 }
@@ -643,7 +636,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260912a";
+var QUIZ_VER="V20260912b";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -678,18 +671,13 @@ function renderPaperAdmin(){
   if(!mine.length)h='<div class="card"><div class="muted" style="padding:16px">'+(IS_MASTER?"还没有试卷，点上面「新建试卷」":"你还没有试卷，点上面「新建试卷」创建一套")+'</div></div>';
   mine.forEach(function(p){
     var st=pState(p);
-    var chips='<div class="chips">'+
-      '<span class="chip">'+qTypeSummary(p.questions)+' · 题库 '+p.questions.length+' 题</span>'+
-      (p.draw>0?'<span class="chip">开考随机抽 '+p.draw+' 题</span>':'')+
-      (p.shuffleQ?'<span class="chip">乱序题</span>':'')+
-      (p.shuffleO?'<span class="chip">乱序选项</span>':'')+
-      (p.switchLimit>0?'<span class="chip r">切屏限制 '+p.switchLimit+' 次</span>':'')+
-      (p.limitMin>0?'<span class="chip">限时 '+p.limitMin+' 分钟</span>':'')+
-      (p.scoreMulti>0?'<span class="chip">多选 '+p.scoreMulti+' 分/题</span>':'')+
-      '<span class="chip gray">每人 '+(p.tries||1)+' 次</span>'+
-      '<span class="chip g">合格 '+(p.passLine!=null?p.passLine:60)+' 分</span>'+
-      '</div>';
-    h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+chips+
+    h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
+       '<div class="pm">'+qTypeSummary(p.questions)+'　题库 '+p.questions.length+' 题'+(p.draw>0?'　<em style="color:#34618e;font-style:normal">随机抽 '+p.draw+' 题</em>':'')+
+       (p.shuffleQ?'　<em style="color:#34618e;font-style:normal">乱序题</em>':'')+(p.shuffleO?'　<em style="color:#34618e;font-style:normal">乱序选项</em>':'')+
+       (p.switchLimit>0?'　<em style="color:#d93a3a;font-style:normal">切屏限制 '+p.switchLimit+' 次</em>':'')+
+       (p.limitMin>0?'　<em style="color:#34618e;font-style:normal">限时 '+p.limitMin+' 分钟</em>':'')+
+       (p.scoreMulti>0?'　<em style="color:#34618e;font-style:normal">多选 '+p.scoreMulti+' 分/题</em>':'')+
+       '　每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分'+
        (p.closeT?'　截止 '+fmtT(p.closeT):'')+(p.showAns===false?'　<em>不公布答案</em>':'')+'</div>'+
        '<div class="row"><button class="btn small" onclick="editPaper(\''+p.id+'\')">编辑</button>'+
        '<button class="btn small green" onclick="copyExamLink(\''+p.id+'\')">复制考试链接</button>'+
@@ -873,41 +861,67 @@ function parseGHJson(d){
   try{return JSON.parse(decodeURIComponent(escape(atob(d.content))))}catch(e){return null}
 }
 function fetchSubs(){
-  /* 成功 resolve(recs数组)；失败 resolve(null)。404 = 还没有任何成绩，视为空数组 */
-  return new Promise(function(resolve){
+  /* 成功 resolve(recs数组)；失败 resolve(null)。404 = 还没有任何成绩，视为空数组。
+     三通道兜底：GitHub API → raw → jsdelivr CDN（api.github.com 在部分网络下不稳，
+     raw/jsdelivr 通常可达；写只能走 API，读必须保证通） */
+  function viaApi(ok,cacheHit){
     var done=false;
     var ctl=(typeof AbortController!=="undefined")?new AbortController():null;
-    var to=setTimeout(function(){if(!done){done=true;if(ctl)ctl.abort();resolve(null)}},8000);
+    var to=setTimeout(function(){if(!done){done=true;if(ctl)ctl.abort();viaRaw(ok,cacheHit)}},6000);
     fetch(SUBS_PATH+"?t="+Date.now(),{headers:ghH(),signal:ctl?ctl.signal:undefined})
       .then(function(r){
-        if(r.status===404){if(!done){done=true;clearTimeout(to);resolve([])}return null}
+        if(r.status===404){if(!done){done=true;clearTimeout(to);ok([])}return null}
         if(!r.ok)throw new Error("HTTP "+r.status);
         return r.json();
       })
       .then(function(d){
-        if(d===null)return;
-        if(done)return;done=true;clearTimeout(to);
-        var j=parseGHJson(d);resolve(Array.isArray(j)?j:[]);
+        if(d===null||done)return;
+        done=true;clearTimeout(to);
+        var j=parseGHJson(d);ok(Array.isArray(j)?j:[]);
       })
-      .catch(function(){if(done)return;done=true;clearTimeout(to);resolve(null)});
+      .catch(function(e){
+        if(done||e==="silent")return;
+        done=true;clearTimeout(to);viaRaw(ok,cacheHit);
+      });
+  }
+  function viaRaw(ok,cacheHit){
+    fetch(RAW+"/data/subs.json?t="+Date.now())
+      .then(function(r){return r.ok?r.json():Promise.reject()})
+      .then(function(j){ok(Array.isArray(j)?j:[])}).catch(function(){viaCdn(ok,cacheHit)});
+  }
+  function viaCdn(ok,cacheHit){
+    fetch("https://cdn.jsdelivr.net/gh/phgithum/cloud-db@main/data/subs.json?t="+Date.now())
+      .then(function(r){return r.ok?r.json():Promise.reject()})
+      .then(function(j){ok(Array.isArray(j)?j:[])}).catch(function(){ok(null)});
+  }
+  return new Promise(function(resolve){
+    viaApi(function(recs){resolve(recs)});
   });
 }
 function pushSubs(recs){
-  /* 把若干条记录合并进云端 subs.json：读现值 → 去重合并 → PUT */
+  /* 把若干条记录合并进云端 subs.json：读现值 → 去重合并 → PUT。
+     读和写都有 8 秒超时——之前写请求挂起会导致整个同步回调永不执行（"一直同步中"的根因） */
   return fetchSubs().then(function(cur){
     if(cur==null)cur=[];
     var map={};
     cur.concat(recs).forEach(function(r){map[r.ts+"_"+normName(r.name)]=r});
     var merged=Object.keys(map).map(function(k){return map[k]});
-    return fetch(SUBS_PATH+"?t="+Date.now(),{headers:ghH()})
-      .then(function(r){return r.ok?r.json():null})
-      .then(function(info){
-        var body={message:"subs update",branch:"main",
-          content:btoa(unescape(encodeURIComponent(JSON.stringify(merged))))};
-        if(info&&info.sha)body.sha=info.sha;
-        return fetch(SUBS_PATH,{method:"PUT",headers:ghH(),body:JSON.stringify(body)})
-          .then(function(r){return r.ok});
-      });
+    return new Promise(function(resolve){
+      var done=false;
+      var ctl=(typeof AbortController!=="undefined")?new AbortController():null;
+      var to=setTimeout(function(){if(!done){done=true;resolve(false)}},8000);
+      fetch(SUBS_PATH+"?t="+Date.now(),{headers:ghH(),signal:ctl?ctl.signal:undefined})
+        .then(function(r){return r.ok?r.json():null})
+        .then(function(info){
+          if(done)return;
+          var body={message:"subs update",branch:"main",
+            content:btoa(unescape(encodeURIComponent(JSON.stringify(merged))))};
+          if(info&&info.sha)body.sha=info.sha;
+          return fetch(SUBS_PATH,{method:"PUT",headers:ghH(),body:JSON.stringify(body),signal:ctl?ctl.signal:undefined})
+            .then(function(r){if(!done){done=true;clearTimeout(to);resolve(r.ok)}});
+        })
+        .catch(function(){if(!done){done=true;clearTimeout(to);resolve(false)}});
+    });
   }).catch(function(){return false});
 }
 function uploadSub(rec){return pushSubs([rec])}
@@ -933,7 +947,9 @@ function loadSubs(manual){
   syncTip("云端同步中…");
   allRecs(function(recs){
     try{renderAdmin()}catch(e){/* 渲染出错也不能把状态提示卡死 */}
-    syncTip(recs?"已同步 ✓":(manual?"云端拉取失败，显示本机缓存":"本机缓存"));
+    var n=(recs||[]).length;
+    if(recs)syncTip("已同步 "+n+" 份答卷 ✓"+(localCache().length?"（本机还有 "+localCache().length+" 份待补传）":""));
+    else syncTip("云端拉取失败，显示本机缓存（点「刷新数据」重试）");
   });
 }
 function visibleRecs(){
