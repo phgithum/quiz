@@ -638,7 +638,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260912f";
+var QUIZ_VER="V20260912g";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -764,7 +764,7 @@ function updQList(){
   document.getElementById("qCount").textContent=EDIT.questions.length;
   var h="";
   EDIT.questions.forEach(function(q,i){
-    h+='<div class="qedit"><span class="del" onclick="delQ('+i+')">删除</span>'+
+    h+='<div class="qedit" onpaste="qpaste(event,'+i+')"><span class="del" onclick="delQ('+i+')">删除</span>'+
        '<div style="font-size:12px;color:#888;margin-bottom:6px">第'+(i+1)+'题 · '+TYPE_NAME[q.type]+
        (q.type==="blank"?'（参考答案：<b style="color:#18a055">'+(q.ans.trim()||"未设，填了即得分")+'</b>）':'')+
        (q.type==="survey"?'（<b style="color:#c77d0a">调研题不计分</b>，选「'+(q.multi?'多选':'单选')+'」'+(q.other?' · 含「其他」':'')+'）':'')+
@@ -831,6 +831,28 @@ function toggleAns(i,j,on){
 }
 /* ========== 题目配图：压缩后单独传到 cloud-db/img/，题目 JSON 只存文件名 ========== */
 function pickImg(i){document.getElementById("imgf"+i).click()}
+/* 在题目编辑区任意输入框里直接 Ctrl+V 粘贴截图 → 自动压缩上传为该题配图 */
+function qpaste(e,i){
+  var items=e.clipboardData&&e.clipboardData.items;
+  if(!items)return;
+  var f=null;
+  for(var k=0;k<items.length;k++){
+    if(items[k].type&&items[k].type.indexOf("image")===0){f=items[k].getAsFile();break}
+  }
+  if(!f)return;
+  e.preventDefault();
+  compressImg(f,function(dataUrl){
+    if(!dataUrl){alert("图片处理失败，请重试");return}
+    var name="q-"+Date.now()+"-"+Math.floor(Math.random()*900+100)+".jpg";
+    EDIT.questions[i]._imgBusy=true;updQList();
+    uploadImgToCloud(name,dataUrl,function(ok){
+      EDIT.questions[i]._imgBusy=false;
+      if(ok)EDIT.questions[i].img=name;
+      else alert("图片上传失败（网络问题），请重试");
+      updQList();
+    });
+  });
+}
 function delImg(i){EDIT.questions[i].img="";updQList()}
 function uploadQImg(i,el){
   var f=el.files&&el.files[0];
