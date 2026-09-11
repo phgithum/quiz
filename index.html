@@ -345,7 +345,7 @@ function renderHome(){
   PAPERS.forEach(function(p){
     var st=pState(p);
     h+='<div class="paper" onclick="openPaper(\''+p.id+'\')">'+
-       '<div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
+       '<div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span>'+(p.stopped?'<span class="st" style="color:#d93a3a;font-weight:600">已停止</span>':'')+'</div>'+
        '<div class="pm">'+qTypeSummary(p.questions)+'　共 '+p.questions.length+' 题　满分 100<br>'+
        (p.closeT?'截止：<b>'+fmtT(p.closeT)+'</b>　':'')+'每人 '+(p.tries||1)+' 次　合格 '+(p.passLine!=null?p.passLine:60)+' 分</div></div>';
   });
@@ -366,7 +366,8 @@ function openPaper(id){
   if(p.closeT)info.push('截止：<b>'+fmtT(p.closeT)+'</b>');
   if(st==="early")info.push('<span class="warn">⚠ 考试尚未开始，到点才能进</span>');
   if(st==="over")info.push('<span class="warn">⚠ 考试已结束</span>');
-  document.getElementById("startBtn").disabled=(st!=="ing");
+  if(p.stopped)info.unshift('<span class="warn">⚠ 该考试已被老师停止，无法作答</span>');
+  document.getElementById("startBtn").disabled=(st!=="ing")||!!p.stopped;
   document.getElementById("startBtn").textContent="开始答题";
   document.getElementById("pInfo").innerHTML=info.join("<br>");
   document.getElementById("nameInput").value="";
@@ -397,6 +398,7 @@ function startExam(){
   var st=pState(CUR);
   if(st==="early"){alert("考试尚未开始，请等到 "+fmtT(CUR.openT));return}
   if(st==="over"){alert("考试已于 "+fmtT(CUR.closeT)+" 结束，不能再答题");return}
+  if(CUR.stopped){alert("该考试已被老师停止，无法作答");return}
   var tries=Math.max(1,parseInt(CUR.tries,10)||1);
   var b=document.getElementById("startBtn");
   b.disabled=true;b.textContent="检查答题次数…";
@@ -420,6 +422,7 @@ function startExam(){
     renderQuiz();show("pgQuiz");
     swStart(parseInt(CUR.switchLimit,10)||0);   /* 先弹提示再开启检测，避免提示弹窗自己的失焦被误计 */
     examTimerStart();   /* 限时考试开始倒计时（0=不限时） */
+    stopPollStart();    /* 老师后台"停止考试"后，答题中的学生 1～5 分钟内被自动收卷 */
   });
 }
 
@@ -591,7 +594,7 @@ function renderResult(rec){
   });
   document.getElementById("resDetail").innerHTML=h;
 }
-function backHome(){DIRECT=false;reloadHome();show("pgHome")}
+function backHome(){stopPollStop();DIRECT=false;reloadHome();show("pgHome")}
 var _loadingHome=false;
 function reloadHome(){
   if(_loadingHome)return;_loadingHome=true;
@@ -638,7 +641,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260912g";
+var QUIZ_VER="V20260912h";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -673,7 +676,7 @@ function renderPaperAdmin(){
   if(!mine.length)h='<div class="card"><div class="muted" style="padding:16px">'+(IS_MASTER?"还没有试卷，点上面「新建试卷」":"你还没有试卷，点上面「新建试卷」创建一套")+'</div></div>';
   mine.forEach(function(p){
     var st=pState(p);
-    h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span></div>'+
+    h+='<div class="paper" style="cursor:default"><div class="pt">'+esc(p.title)+'<span class="st '+st+'">'+ST_TXT[st]+'</span>'+(p.stopped?'<span class="st" style="color:#d93a3a;font-weight:600">已停止</span>':'')+'</div>'+
        '<div class="pm">'+qTypeSummary(p.questions)+'　题库 '+p.questions.length+' 题'+(p.draw>0?'　<em style="color:#34618e;font-style:normal">随机抽 '+p.draw+' 题</em>':'')+
        (p.shuffleQ?'　<em style="color:#34618e;font-style:normal">乱序题</em>':'')+(p.shuffleO?'　<em style="color:#34618e;font-style:normal">乱序选项</em>':'')+
        (p.switchLimit>0?'　<em style="color:#d93a3a;font-style:normal">切屏限制 '+p.switchLimit+' 次</em>':'')+
@@ -684,6 +687,7 @@ function renderPaperAdmin(){
        '<div class="row"><button class="btn small" onclick="editPaper(\''+p.id+'\')">编辑</button>'+
        '<button class="btn small green" onclick="copyExamLink(\''+p.id+'\')">复制考试链接</button>'+
        '<button class="btn small gray" onclick="dupPaper(\''+p.id+'\')">复制</button>'+
+       '<button class="btn small '+(p.stopped?'':'red')+'" onclick="toggleStop(\''+p.id+'\')">'+(p.stopped?'恢复考试':'停止考试')+'</button>'+
        '<button class="btn small red" onclick="delPaper(\''+p.id+'\')">删除</button></div></div>';
   });
   document.getElementById("paperAdminList").innerHTML=h;
@@ -723,6 +727,19 @@ function delPaper(id){
     delPaperRecords(p,function(n){
       document.getElementById("papersTip").textContent="✔ 试卷已删除，连带清除了 "+n+" 份答卷记录";
     });
+  });
+}
+/* 停止 / 恢复考试：stopped 标记写进试卷 JSON。
+   学生端：进不来 + 答题中的每 60 秒检查一次，发现停止就自动交卷 */
+function toggleStop(id){
+  var p=PAPERS.filter(function(x){return x.id===id})[0];if(!p)return;
+  var toStop=!p.stopped;
+  if(!confirm(toStop?("确定停止「"+p.title+"」这场考试？\n停止后所有人立即无法进入；正在答题的人会在 1～5 分钟内被自动收卷。"):("确定恢复「"+p.title+"」？恢复后学生可正常作答。")))return;
+  p.stopped=toStop;
+  savePapers(PAPERS,document.getElementById("papersTip"),toStop?"停止中…":"恢复中…").then(function(ok){
+    if(!ok){p.stopped=!toStop;return}
+    renderPaperAdmin();renderHome();
+    document.getElementById("papersTip").textContent=toStop?"✔ 考试已停止":"✔ 考试已恢复";
   });
 }
 function delPaperRecords(p,cb,pass){
@@ -1343,6 +1360,7 @@ function dlCSV(rows,prefix){
 
 /* ================= 专属链接锁死 ================= */
 function forceExit(msg){
+  stopPollStop();
   document.querySelectorAll(".page").forEach(function(p){p.classList.add("hide")});
   var d=document.createElement("div");
   d.style.cssText="position:fixed;inset:0;background:#f2f4f8;display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px";
@@ -1425,6 +1443,29 @@ function examTimerStop(){
   clearInterval(TIMER.int);
   if(CUR&&studentName)localStorage.removeItem("quiz_dl_"+CUR.id+"_"+studentName);
 }
+/* ===== 考试停止轮询：答题中每 60 秒检查一次试卷是否被老师停止 =====
+   走 raw 通道（不占 GitHub API 配额），raw 有约 5 分钟 CDN 缓存，
+   所以从老师点"停止"到学生被收卷，延迟 1～5 分钟。 */
+var STOP_POLL=null;
+function stopPollStart(){
+  stopPollStop();
+  STOP_POLL=setInterval(function(){
+    if(!CUR)return;
+    fetch(RAW+"/exam/papers.json?t="+Date.now())
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(j){
+        if(!Array.isArray(j)||!CUR)return;
+        var p=j.filter(function(x){return x.id===CUR.id})[0];
+        if(p&&p.stopped){
+          stopPollStop();
+          alert("老师已停止这场考试，现在自动交卷。已答的题目会正常保存成绩。");
+          CUR.stopped=true;
+          submitQuiz(true);
+        }
+      }).catch(function(){});
+  },60000);
+}
+function stopPollStop(){if(STOP_POLL){clearInterval(STOP_POLL);STOP_POLL=null}}
 /* ================= 启动 ================= */
 document.getElementById("pwdInput").addEventListener("keydown",function(e){if(e.key==="Enter")adminLogin()});
 document.getElementById("nameInput").addEventListener("keydown",function(e){if(e.key==="Enter")startExam()});
