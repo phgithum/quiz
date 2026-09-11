@@ -636,7 +636,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260912d";
+var QUIZ_VER="V20260912e";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
@@ -725,12 +725,17 @@ function delPaper(id){
 }
 function delPaperRecords(p,cb,pass){
   pass=pass||1;
+  var bad=function(r){return r.paperId===p.id||r.paperTitle===p.title};
+  /* 本机待补传缓存里该卷的记录也一并清掉，防止下次进后台补传时"复活" */
+  var rest=localCache().filter(function(r){return !bad(r)});
+  if(rest.length!==localCache().length)saveLocalCache(rest);
   fetchSubs().then(function(recs){
     if(recs==null)return cb(0);
-    var keep=recs.filter(function(r){return r.paperId!==p.id&&r.paperTitle!==p.title});
+    var keep=recs.filter(function(r){return !bad(r)});
     var n=recs.length-keep.length;
+    CLOUD=keep;
     if(!n)return cb(0);
-    pushSubs(keep).then(function(ok){cb(ok?n:0)});
+    putSubs(keep).then(function(ok){cb(ok?n:0)});
   });
 }
 /* 总览页：清除已删试卷的残留成绩记录（按卷名匹配） */
@@ -740,7 +745,7 @@ function purgeOrphan(t){
   syncTip("清理残留中…");
   delPaperRecords({id:"__gone__",title:t},function(n){
     CLOUD=CLOUD.filter(function(r){return r.paperTitle!==t});
-    saveLocalCache(CLOUD);
+    saveLocalCache(localCache().filter(function(r){return r.paperTitle!==t}));
     renderAdmin();
     syncTip(n?("已清除 "+n+" 条残留记录 ✓"):"未发现残留（可能刚才是缓存，已刷新）");
   });
@@ -925,6 +930,26 @@ function pushSubs(recs){
   }).catch(function(){return false});
 }
 function uploadSub(rec){return pushSubs([rec])}
+function putSubs(recs){
+  /* 覆盖写：直接用 recs 替换云端 subs.json，不与现值合并。
+     删除场景必须用它——pushSubs 的"读现值→合并"会把刚删掉的记录加回去（复活 bug） */
+  return new Promise(function(resolve){
+    var done=false;
+    var ctl=(typeof AbortController!=="undefined")?new AbortController():null;
+    var to=setTimeout(function(){if(!done){done=true;resolve(false)}},8000);
+    fetch(SUBS_PATH+"?t="+Date.now(),{headers:ghH(),signal:ctl?ctl.signal:undefined})
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(info){
+        if(done)return;
+        var body={message:"subs update",branch:"main",
+          content:btoa(unescape(encodeURIComponent(JSON.stringify(recs))))};
+        if(info&&info.sha)body.sha=info.sha;
+        return fetch(SUBS_PATH,{method:"PUT",headers:ghH(),body:JSON.stringify(body),signal:ctl?ctl.signal:undefined})
+          .then(function(r){if(!done){done=true;clearTimeout(to);resolve(r.ok)}});
+      })
+      .catch(function(){if(!done){done=true;clearTimeout(to);resolve(false)}});
+  });
+}
 function allRecs(cb){
   /* 终极兜底：不管内部发生什么，20 秒后必须出结果，同步提示不可能永远卡住 */
   var called=false;
