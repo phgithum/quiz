@@ -137,6 +137,7 @@ tr:nth-child(even) td{background:#fafbfe}
   <div class="tabs">
     <button class="btn small" id="tabB1" onclick="switchTab(0)">试卷管理</button>
     <button class="btn small gray" id="tabB2" onclick="switchTab(1)">成绩查询</button>
+    <button class="btn small gray" id="tabB4" onclick="loadSubs(true)">刷新数据</button>
     <button class="btn small gray" id="tabB3" onclick="adminLogout()">退出登录</button>
   </div>
 
@@ -633,7 +634,7 @@ function loadAccs(cb){
       .then(function(j){cb(j||[])}).catch(function(){tryOne(i+1)});
   })(0);
 }
-var QUIZ_VER="V20260911c";
+var QUIZ_VER="V20260911d";
 try{document.getElementById("verTag").textContent=QUIZ_VER}catch(e){}
 function enterAdmin(){
   document.getElementById("whoBar").textContent="当前登录："+sessionStorage.getItem("quiz_admin_who")+" · "+QUIZ_VER;
